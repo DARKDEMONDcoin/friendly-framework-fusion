@@ -3,6 +3,43 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getSkill } from "@/data/skills";
+import { freeChat, gatherEvidence, planResearch } from "@/lib/nour-research.server";
+
+/** الموظفون الذين يعتمدون على بحث حقيقي قبل الإجابة. */
+const RESEARCH_EMPLOYEES = new Set(["nour"]);
+
+/** يجمع أدلة حقيقية مجانية (اقتراحات بحث، نتائج SERP، تحليل صفحات، Search Console). */
+async function researchFor(
+  employeeId: string,
+  apiKey: string,
+  brand: { name: string; industry: string },
+  message: string,
+  workspaceId: string,
+): Promise<{ block: string; used: string[] }> {
+  if (!RESEARCH_EMPLOYEES.has(employeeId)) return { block: "", used: [] };
+  try {
+    const plan = await planResearch(apiKey, brand, message);
+    if (
+      !plan.keywords?.length &&
+      !plan.searches?.length &&
+      !plan.urls?.length &&
+      !plan.useSearchConsole
+    ) {
+      return { block: "", used: [] };
+    }
+    const evidence = await gatherEvidence(plan, workspaceId);
+    return { block: evidence.block, used: evidence.used };
+  } catch (error) {
+    console.error("[nour] research failed:", error);
+    return { block: "", used: [] };
+  }
+}
+
+const evidenceRules = [
+  "استخدم كتلة «أدلة ميدانية» أدناه كمصدر وحيد للأرقام والمنافسين والكلمات — لا تخترع بيانات غيرها.",
+  "اذكر مصدر كل رقم مهم (Search Console، اقتراحات البحث، نتائج البحث، تحليل الصفحة).",
+  "إن كانت الأدلة ناقصة، قل ذلك صراحة واقترح ما يلزم لجمعها.",
+].join("\n");
 
 const personas: Record<string, { name: string; role: string; channel: string; kind: string }> = {
   sonny: {
