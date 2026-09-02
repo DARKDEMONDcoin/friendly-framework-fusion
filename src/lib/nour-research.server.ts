@@ -7,6 +7,7 @@ import {
   type SerpResult,
 } from "./seo-research.server";
 import { gscSnapshotFor } from "./gsc.functions";
+import { ga4SnapshotFor } from "./ga4.functions";
 
 export type ResearchPlan = {
   keywords?: string[];
@@ -142,13 +143,14 @@ export async function gatherEvidence(
   plan: ResearchPlan,
   workspaceId: string,
 ): Promise<Evidence> {
-  const [keywordSets, metricSets, serpSets, audits, inventories, gsc] = await Promise.all([
+  const [keywordSets, metricSets, serpSets, audits, inventories, gsc, ga4] = await Promise.all([
     Promise.all((plan.keywords ?? []).map((k) => keywordExpansion(k))),
     Promise.all((plan.keywords ?? []).slice(0, 3).map((k) => keywordMetrics(k))),
     Promise.all((plan.searches ?? []).map(async (q) => ({ q, results: await serpSearch(q) }))),
     Promise.all((plan.urls ?? []).map((u) => auditPage(u))),
     Promise.all((plan.competitors ?? []).map((d) => competitorInventory(d))),
     plan.useSearchConsole ? gscSnapshotFor(workspaceId) : Promise.resolve(null),
+    plan.useSearchConsole ? ga4SnapshotFor(workspaceId) : Promise.resolve(null),
   ]);
 
   const parts: string[] = [];
@@ -256,6 +258,21 @@ export async function gatherEvidence(
         fmt(gsc.queries) || "- لا بيانات",
         "أعلى الصفحات:",
         fmt(gsc.pages) || "- لا بيانات",
+      ].join("\n"),
+    );
+  }
+
+  if (ga4) {
+    used.push("بيانات Google Analytics 4");
+    parts.push(
+      [
+        `### بيانات GA4 الحقيقية (خاصية ${ga4.property}، ${ga4.range.start} → ${ga4.range.end})`,
+        `الإجمالي: جلسات ${ga4.totals.sessions} | مستخدمون ${ga4.totals.users} | جلسات متفاعلة ${ga4.totals.engagedSessions}`,
+        "القنوات:",
+        ga4.channels.map((c) => `- ${c.channel}: ${c.sessions} جلسة`).join("\n") || "- لا بيانات",
+        "أعلى صفحات الهبوط من البحث العضوي:",
+        ga4.organicLandingPages.map((p) => `- ${p.page}: ${p.sessions} جلسة`).join("\n") ||
+          "- لا بيانات",
       ].join("\n"),
     );
   }
