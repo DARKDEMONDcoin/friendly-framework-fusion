@@ -17,14 +17,19 @@ export type ResearchPlan = {
 
 const OPENROUTER = "https://openrouter.ai/api/v1/chat/completions";
 
-/** أفضل النماذج المجانية على OpenRouter بترتيب الجودة، مع تجاوز تلقائي عند الفشل. */
+/**
+ * أفضل النماذج المجانية على OpenRouter بترتيب مُختبَر (جودة عربية + سرعة + توافر)،
+ * مع تجاوز تلقائي عند 429/5xx أو رد فارغ.
+ */
 export const FREE_MODELS = [
-  "z-ai/glm-5.2:free",
-  "minimax/minimax-m3:free",
   "nvidia/nemotron-3-ultra-550b-a55b:free",
-  "google/gemma-4-31b-it:free",
+  "minimax/minimax-m3:free",
+  "nvidia/nemotron-3-super-120b-a12b:free",
+  "minimax/minimax-m2.7:free",
+  "z-ai/glm-5.2:free",
   "openrouter/free",
 ];
+
 
 /** نداء النموذج عبر OpenRouter (نماذج مجانية) مع تجاوز تلقائي بين النماذج. */
 export async function freeChat(
