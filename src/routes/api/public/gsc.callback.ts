@@ -42,7 +42,10 @@ export const Route = createFileRoute("/api/public/gsc/callback")({
           });
           if (meRes.ok) email = ((await meRes.json()) as { email?: string }).email;
 
-          const config: SearchConsoleConfig = { refreshToken: tokens.refresh_token, email };
+          const config: SearchConsoleConfig = email
+            ? { refreshToken: tokens.refresh_token, email }
+            : { refreshToken: tokens.refresh_token };
+
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
           const { error } = await supabaseAdmin.from("integration_credentials").upsert(
             {
