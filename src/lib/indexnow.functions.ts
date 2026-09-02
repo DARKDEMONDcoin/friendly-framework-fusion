@@ -9,19 +9,23 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
  */
 type IndexNowConfig = { key: string; keyLocation: string; host: string };
 
-type AdminClient = Awaited<
-  ReturnType<typeof import("@/integrations/supabase/client.server").getSupabaseAdmin>
->;
-
 async function assertOwner(
-  supabase: { rpc: (fn: string, args: Record<string, string>) => Promise<{ data: unknown }> },
+  supabase: {
+    rpc: (
+      fn: "owns_workspace",
+      args: { _workspace_id: string },
+    ) => PromiseLike<{ data: unknown; error: { message: string } | null }>;
+  },
   workspaceId: string,
 ) {
-  const { data } = await supabase.rpc("owns_workspace", { _workspace_id: workspaceId });
-  if (data !== true) throw new Error("لا تملك صلاحية على مساحة العمل هذه.");
-  const { getSupabaseAdmin } = await import("@/integrations/supabase/client.server");
-  return getSupabaseAdmin();
+  const { data, error } = await supabase.rpc("owns_workspace", { _workspace_id: workspaceId });
+  if (error) throw new Error(error.message);
+  if (data !== true) throw new Error("Forbidden: لا تملك هذه مساحة العمل.");
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  return supabaseAdmin;
 }
+
+type AdminClient = Awaited<ReturnType<typeof assertOwner>>;
 
 /** توليد مفتاح IndexNow صالح (أحرف/أرقام، 32 حرفاً). */
 function generateKey(): string {
