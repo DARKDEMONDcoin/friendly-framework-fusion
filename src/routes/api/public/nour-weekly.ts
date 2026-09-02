@@ -19,14 +19,11 @@ export const Route = createFileRoute("/api/public/nour-weekly")({
         const envSecret = process.env["LOVABLE_CRON_SECRET"];
         let authorized = Boolean(envSecret) && provided === envSecret;
         if (!authorized) {
-          const { data: tokenRow } = await supabaseAdmin
-            .schema("private")
-            .from("cron_tokens")
-            .select("token")
-            .eq("name", "nour-weekly")
-            .maybeSingle();
-          const dbToken = (tokenRow as { token?: string } | null)?.token;
-          authorized = Boolean(dbToken) && provided === dbToken;
+          const { data: valid } = await supabaseAdmin.rpc("verify_cron_token", {
+            _name: "nour-weekly",
+            _token: provided,
+          });
+          authorized = valid === true;
         }
         if (!authorized) return new Response("unauthorized", { status: 401 });
 
