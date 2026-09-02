@@ -73,6 +73,10 @@ function ChatPage() {
   const employeeSkills = skillsFor(id);
 
   const owned = (integrations ?? []).filter((i) => i.employee_id === id);
+  const wpConnected = (integrations ?? []).some(
+    (i) => i.provider === "wordpress" && i.status === "connected",
+  );
+
 
   const send = useMutation({
     mutationFn: (message: string) =>
