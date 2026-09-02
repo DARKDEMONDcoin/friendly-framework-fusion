@@ -5,6 +5,8 @@ import {
   MessagesSquare,
   CheckCheck,
   ListChecks,
+  CalendarClock,
+  FileBarChart,
   BrainCircuit,
   Plug,
   Settings,
