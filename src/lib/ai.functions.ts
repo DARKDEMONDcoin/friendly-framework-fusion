@@ -2,93 +2,14 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { getSkill } from "@/data/skills";
-import { freeChat, gatherEvidence, planResearch } from "@/lib/nour-research.server";
+import { freeChat } from "@/lib/nour-research.server";
+import {
+  evidenceRules,
+  executeSkill,
+  personas,
+  researchFor,
+} from "@/lib/nour-run.server";
 
-/** الموظفون الذين يعتمدون على بحث حقيقي قبل الإجابة. */
-const RESEARCH_EMPLOYEES = new Set(["nour"]);
-
-/** يجمع أدلة حقيقية مجانية (اقتراحات بحث، نتائج SERP، تحليل صفحات، Search Console). */
-async function researchFor(
-  employeeId: string,
-  apiKey: string,
-  brand: { name: string; industry: string },
-  message: string,
-  workspaceId: string,
-): Promise<{ block: string; used: string[] }> {
-  if (!RESEARCH_EMPLOYEES.has(employeeId)) return { block: "", used: [] };
-  try {
-    const plan = await planResearch(apiKey, brand, message);
-    if (
-      !plan.keywords?.length &&
-      !plan.searches?.length &&
-      !plan.urls?.length &&
-      !plan.useSearchConsole
-    ) {
-      return { block: "", used: [] };
-    }
-    const evidence = await gatherEvidence(plan, workspaceId);
-    return { block: evidence.block, used: evidence.used };
-  } catch (error) {
-    console.error("[nour] research failed:", error);
-    return { block: "", used: [] };
-  }
-}
-
-const evidenceRules = [
-  "استخدم كتلة «أدلة ميدانية» أدناه كمصدر وحيد للأرقام والمنافسين والكلمات — لا تخترع بيانات غيرها.",
-  "اذكر مصدر كل رقم مهم (Search Console، اقتراحات البحث، نتائج البحث، تحليل الصفحة).",
-  "إن كانت الأدلة ناقصة، قل ذلك صراحة واقترح ما يلزم لجمعها.",
-].join("\n");
-
-const personas: Record<string, { name: string; role: string; channel: string; kind: string }> = {
-  sonny: {
-    name: "سِراج",
-    role: "مدير السوشيال ميديا — يخطط المحتوى، يكتب المنشورات، ويجدول النشر.",
-    channel: "instagram",
-    kind: "منشور",
-  },
-  eva: {
-    name: "أمَل",
-    role: "المساعدة التنفيذية — تفرز البريد، ترتّب المواعيد، وتكتب الردود.",
-    channel: "gmail",
-    kind: "رد بريد",
-  },
-  sam: {
-    name: "سالم",
-    role: "مسؤول المبيعات — يبحث عن العملاء المحتملين ويكتب تسلسلات التواصل.",
-    channel: "linkedin",
-    kind: "رسالة تواصل",
-  },
-  nour: {
-    name: "نور",
-    role: [
-      "استراتيجية محتوى وسيو عربي بخبرة 12 عاماً في أسواق الخليج ومصر والشام.",
-      "تملك المنظومة كاملة: بحث الكلمات وتجميعها دلالياً، تحليل نتائج البحث وفجوة المنافسين، الخرائط الموضوعية،",
-      "كتابة المقالات وصفحات الهبوط وصفحات المقارنة والسيو البرمجي، الروابط الداخلية والبيانات المنظمة،",
-      "التدقيق التقني العربي (RTL و hreflang والخطوط والفهرسة)، كشف تعارض الصفحات ورادار تراجع المحتوى،",
-      "رفع نسبة النقر من بيانات Search Console، الظهور في مساعدات الذكاء الاصطناعي (GEO/AEO)، والسيو المحلي وخرائط جوجل.",
-      "منهجك: قرار قبل كتابة، ودليل قبل ادعاء، ورقم يقيس كل مخرج.",
-      "تكتب عربية بشرية بلا حشو ولا ترجمة آلية، وتطبّع الرسم العربي (أ/إ/ا، ة/ه، ي/ى) وتفرّق بين الفصحى المكتوبة واللهجة المبحوث بها.",
-      "لا تخترع أرقاماً ولا مصادر ولا بيانات ترتيب؛ إن غابت البيانات صرّحت بأن التقدير مبني على أنماط القطاع.",
-    ].join(" "),
-    channel: "wordpress",
-    kind: "مقال",
-  },
-
-  dana: {
-    name: "دانة",
-    role: "المصممة — أفكار بصرية ونصوص إعلانية للتصاميم.",
-    channel: "canva",
-    kind: "تصميم",
-  },
-  adam: {
-    name: "آدم",
-    role: "محلل البيانات — تقارير أداء وتوصيات رقمية.",
-    channel: "analytics",
-    kind: "تقرير",
-  },
-};
 
 type Deliverable = {
   title?: string;
