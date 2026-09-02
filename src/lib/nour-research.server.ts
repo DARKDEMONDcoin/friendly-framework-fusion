@@ -15,39 +15,61 @@ export type ResearchPlan = {
   useSearchConsole?: boolean;
 };
 
-const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const MODELS = ["google/gemini-3.7-flash", "google/gemini-3.7-flash-lite"];
+const OPENROUTER = "https://openrouter.ai/api/v1/chat/completions";
 
-/** نداء النموذج عبر بوابة Lovable AI مع تجاوز تلقائي عند فشل النموذج الأول. */
+/** أفضل النماذج المجانية على OpenRouter بترتيب الجودة، مع تجاوز تلقائي عند الفشل. */
+export const FREE_MODELS = [
+  "z-ai/glm-5.2:free",
+  "minimax/minimax-m3:free",
+  "nvidia/nemotron-3-ultra-550b-a55b:free",
+  "google/gemma-4-31b-it:free",
+  "openrouter/free",
+];
+
+/** نداء النموذج عبر OpenRouter (نماذج مجانية) مع تجاوز تلقائي بين النماذج. */
 export async function freeChat(
   apiKey: string,
   messages: { role: string; content: string }[],
   options: { json?: boolean } = {},
 ): Promise<string> {
   let lastError = "";
-  for (const model of MODELS) {
-    const res = await fetch(GATEWAY, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model,
-        ...(options.json ? { response_format: { type: "json_object" } } : {}),
-        messages,
-      }),
-    });
-    if (res.status === 429) throw new Error("تجاوزت حد الاستخدام مؤقتاً — حاول بعد قليل.");
-    if (res.status === 402)
-      throw new Error("رصيد الذكاء الاصطناعي غير كافٍ — أضف رصيداً للمتابعة.");
-    if (res.ok) {
-      const payload = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-      const content = payload.choices?.[0]?.message?.content ?? "";
-      if (content.trim()) return content;
-      lastError = "رد فارغ";
+  for (const model of FREE_MODELS) {
+    let res: Response;
+    try {
+      res = await fetch(OPENROUTER, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://friendly-framework-fusion.lovable.app",
+          "X-Title": "Nour AI Employee",
+        },
+        body: JSON.stringify({
+          model,
+          ...(options.json ? { response_format: { type: "json_object" } } : {}),
+          messages,
+        }),
+      });
+    } catch {
+      lastError = "تعذّر الاتصال بمزوّد النماذج";
       continue;
     }
-    lastError = String(res.status);
+    if (res.status === 401) throw new Error("مفتاح OpenRouter غير صالح.");
+    if (res.ok) {
+      const payload = (await res.json()) as {
+        choices?: { message?: { content?: string } }[];
+        error?: { message?: string };
+      };
+      const content = payload.choices?.[0]?.message?.content ?? "";
+      if (content.trim()) return content;
+      lastError = payload.error?.message ?? "رد فارغ";
+      continue;
+    }
+    // 429 (حد مجاني) أو 5xx: ننتقل للنموذج التالي بدل الفشل
+    lastError = `${res.status}`;
   }
-  throw new Error(`تعذّر توليد الرد (${lastError}).`);
+  throw new Error(`تعذّر توليد الرد من النماذج المجانية (${lastError}).`);
+
 }
 
 export function parseJson<T>(raw: string): T | null {
