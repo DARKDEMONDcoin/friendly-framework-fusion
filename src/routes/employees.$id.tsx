@@ -105,7 +105,7 @@ function MemberPage() {
           <p className="mt-6 max-w-2xl text-lg leading-relaxed text-white/90">{m.summary}</p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
-              to="/login"
+              to="/app"
               className="rounded-full bg-background px-7 py-3.5 font-bold text-foreground shadow-lift transition-transform duration-300 hover:-translate-y-1"
             >
               وظّف {m.name} الآن

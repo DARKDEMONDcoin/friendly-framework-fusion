@@ -28,7 +28,7 @@ const cols: { t: string; l: { label: string; to: string }[] }[] = [
       { label: "الأمان", to: "/security" },
       { label: "الخصوصية", to: "/privacy" },
       { label: "الشروط", to: "/terms" },
-      { label: "تسجيل الدخول", to: "/login" },
+      { label: "جرّب الموظفين", to: "/app" },
     ],
   },
 ];

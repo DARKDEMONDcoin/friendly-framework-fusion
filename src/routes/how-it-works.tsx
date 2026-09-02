@@ -100,7 +100,7 @@ function HowPage() {
               الخطأ في المهام القادمة.
             </p>
             <Link
-              to="/login"
+              to="/app"
               className="mt-6 inline-flex rounded-full bg-foreground px-7 py-3.5 font-bold text-background transition-transform duration-300 hover:-translate-y-1"
             >
               ابدأ الآن مجاناً

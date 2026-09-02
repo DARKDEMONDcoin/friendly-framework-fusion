@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard,
   MessagesSquare,
@@ -13,12 +13,10 @@ import {
   Bell,
   Menu,
   X,
-  LogOut,
 } from "lucide-react";
 
 import { team } from "@/data/team";
 import { useProfile, useTasks, useWorkspace } from "@/lib/data";
-import { signOut } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 const nav = [
@@ -163,7 +161,6 @@ export function AppShell({
   padded?: boolean;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const navigate = useNavigate();
   const { data: profile } = useProfile();
   const initial = (profile?.full_name ?? "ع").trim().charAt(0) || "ع";
 
@@ -209,16 +206,6 @@ export function AppShell({
               >
                 <Bell className="size-4.5" />
               </Link>
-              <button
-                onClick={async () => {
-                  await signOut();
-                  void navigate({ to: "/login" });
-                }}
-                className="grid size-10 place-items-center rounded-xl border border-border transition-colors hover:bg-secondary"
-                aria-label="تسجيل الخروج"
-              >
-                <LogOut className="size-4.5" />
-              </button>
               <span className="grid size-10 place-items-center rounded-xl bg-foreground font-display text-sm font-black text-background">
                 {initial}
               </span>
