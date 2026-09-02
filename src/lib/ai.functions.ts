@@ -265,6 +265,21 @@ export const runSkill = createServerFn({ method: "POST" })
       .map((b) => `- [${b.kind}] ${b.title}${b.body ? `: ${b.body}` : ""}`)
       .join("\n");
 
+    const prompt = skill.buildPrompt(data.values);
+
+    const requestSummary = Object.entries(data.values)
+      .filter(([, v]) => v?.trim())
+      .map(([k, v]) => `${k}: ${v['length'] > 120 ? `${v.slice(0, 120)}…` : v}`)
+      .join(" · ");
+
+    const research = await researchFor(
+      data.employeeId,
+      apiKey,
+      { name: workspace.name, industry: workspace.industry },
+      `${skill.title}\n${requestSummary}`,
+      data.workspaceId,
+    );
+
     const system = [
       `أنت ${persona.name}، ${persona.role}`,
       `تعمل داخل منصة «سهل» لصالح العلامة: ${workspace.name} (${workspace.industry}).`,
@@ -273,18 +288,12 @@ export const runSkill = createServerFn({ method: "POST" })
         ? `كلمات ممنوعة تماماً: ${workspace.banned_words.join("، ")}.`
         : "",
       brainText ? `معرفة العلامة:\n${brainText}` : "",
+      research.block ? `${evidenceRules}\n\n## أدلة ميدانية (لحظية)\n${research.block}` : "",
       "أنت تنفّذ الآن مهمة محددة وتسلّم مخرجاً نهائياً جاهزاً للاستخدام — لا أسئلة ولا مقدمات ولا اعتذارات.",
       "اكتب بالعربية الفصحى الواضحة، بصيغة Markdown منسّقة، والتزم حرفياً بالهيكل المطلوب.",
     ]
       .filter(Boolean)
       .join("\n");
-
-    const prompt = skill.buildPrompt(data.values);
-
-    const requestSummary = Object.entries(data.values)
-      .filter(([, v]) => v?.trim())
-      .map(([k, v]) => `${k}: ${v['length'] > 120 ? `${v.slice(0, 120)}…` : v}`)
-      .join(" · ");
 
     await supabase.from("messages").insert({
       workspace_id: data.workspaceId,
@@ -293,31 +302,14 @@ export const runSkill = createServerFn({ method: "POST" })
       body: `▸ ${skill.title}${requestSummary ? `\n${requestSummary}` : ""}`,
     });
 
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "z-ai/glm-5.2:free",
-        models: [
-          "z-ai/glm-5.2:free",
-          "google/gemini-2.0-flash-exp:free",
-          "meta-llama/llama-3.3-70b-instruct:free",
-        ],
-        route: "fallback",
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: prompt },
-        ],
-      }),
-    });
-
-    if (res.status === 429) throw new Error("تجاوزت حد الاستخدام مؤقتاً — حاول بعد قليل.");
-    if (res.status === 402) throw new Error("رصيد الذكاء الاصطناعي غير كافٍ — أضف رصيداً للمتابعة.");
-    if (!res.ok) throw new Error(`تعذّر تنفيذ المهمة (${res.status}).`);
-
-    const payload = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-    const output = payload.choices?.[0]?.message?.content?.trim() ?? "";
+    let output = (await freeChat(apiKey, [
+      { role: "system", content: system },
+      { role: "user", content: prompt },
+    ])).trim();
     if (!output) throw new Error("لم يصل مخرج من الموظف — أعد المحاولة.");
+    if (research.used.length) {
+      output = `${output}\n\n> مصادر البيانات: ${research.used.join(" · ")}`;
+    }
 
     const { data: assistantRow, error: assistantError } = await supabase
       .from("messages")
