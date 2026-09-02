@@ -57,13 +57,13 @@ export function Nav({ variant = "over" }: { variant?: "over" | "solid" }) {
 
         <div className="hidden items-center gap-2 md:flex">
           <Link
-            to="/login"
+            to="/app"
             className={cn(
               "rounded-full px-4 py-2 text-sm font-semibold transition-colors",
               solid ? "text-ink-soft hover:text-primary" : "text-white/85 hover:text-white",
             )}
           >
-            تسجيل الدخول
+            جرّب الموظفين
           </Link>
           <Link
             to="/contact"
@@ -109,10 +109,10 @@ export function Nav({ variant = "over" }: { variant?: "over" | "solid" }) {
           <li>
             <Link
               onClick={() => setOpen(false)}
-              to="/login"
+              to="/app"
               className="block rounded-xl px-3 py-2.5 font-medium hover:bg-secondary"
             >
-              تسجيل الدخول
+              جرّب الموظفين
             </Link>
           </li>
           <li>
