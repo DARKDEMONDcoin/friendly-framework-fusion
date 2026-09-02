@@ -34,6 +34,7 @@ import { Route as BlogIndexRouteImport } from './routes/blog.index'
 import { Route as BlogSlugRouteImport } from './routes/blog.$slug'
 import { Route as EmployeesIndexRouteImport } from './routes/employees.index'
 import { Route as EmployeesIdRouteImport } from './routes/employees.$id'
+import { Route as ApiPublicNourAutomationsRouteImport } from './routes/api/public/nour-automations'
 import { Route as ApiPublicNourWeeklyRouteImport } from './routes/api/public/nour-weekly'
 import { Route as AppChatIndexRouteImport } from './routes/app.chat.index'
 import { Route as AppChatIdRouteImport } from './routes/app.chat.$id'
@@ -164,6 +165,12 @@ const EmployeesIdRoute = EmployeesIdRouteImport.update({
   path: '/employees/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicNourAutomationsRoute =
+  ApiPublicNourAutomationsRouteImport.update({
+    id: '/api/public/nour-automations',
+    path: '/api/public/nour-automations',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicNourWeeklyRoute = ApiPublicNourWeeklyRouteImport.update({
   id: '/api/public/nour-weekly',
   path: '/api/public/nour-weekly',
@@ -211,6 +218,7 @@ export interface FileRoutesByFullPath {
   '/app/': typeof AppIndexRoute
   '/blog/': typeof BlogIndexRoute
   '/employees/': typeof EmployeesIndexRoute
+  '/api/public/nour-automations': typeof ApiPublicNourAutomationsRoute
   '/api/public/nour-weekly': typeof ApiPublicNourWeeklyRoute
   '/app/chat/$id': typeof AppChatIdRoute
   '/app/chat/': typeof AppChatIndexRoute
@@ -241,6 +249,7 @@ export interface FileRoutesByTo {
   '/app': typeof AppIndexRoute
   '/blog': typeof BlogIndexRoute
   '/employees': typeof EmployeesIndexRoute
+  '/api/public/nour-automations': typeof ApiPublicNourAutomationsRoute
   '/api/public/nour-weekly': typeof ApiPublicNourWeeklyRoute
   '/app/chat/$id': typeof AppChatIdRoute
   '/app/chat': typeof AppChatIndexRoute
@@ -273,6 +282,7 @@ export interface FileRoutesById {
   '/app/': typeof AppIndexRoute
   '/blog/': typeof BlogIndexRoute
   '/employees/': typeof EmployeesIndexRoute
+  '/api/public/nour-automations': typeof ApiPublicNourAutomationsRoute
   '/api/public/nour-weekly': typeof ApiPublicNourWeeklyRoute
   '/app/chat/$id': typeof AppChatIdRoute
   '/app/chat/': typeof AppChatIndexRoute
@@ -306,6 +316,7 @@ export interface FileRouteTypes {
     | '/app/'
     | '/blog/'
     | '/employees/'
+    | '/api/public/nour-automations'
     | '/api/public/nour-weekly'
     | '/app/chat/$id'
     | '/app/chat/'
@@ -336,6 +347,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/blog'
     | '/employees'
+    | '/api/public/nour-automations'
     | '/api/public/nour-weekly'
     | '/app/chat/$id'
     | '/app/chat'
@@ -367,6 +379,7 @@ export interface FileRouteTypes {
     | '/app/'
     | '/blog/'
     | '/employees/'
+    | '/api/public/nour-automations'
     | '/api/public/nour-weekly'
     | '/app/chat/$id'
     | '/app/chat/'
@@ -393,6 +406,7 @@ export interface RootRouteChildren {
   EmployeesIdRoute: typeof EmployeesIdRoute
   BlogIndexRoute: typeof BlogIndexRoute
   EmployeesIndexRoute: typeof EmployeesIndexRoute
+  ApiPublicNourAutomationsRoute: typeof ApiPublicNourAutomationsRoute
   ApiPublicNourWeeklyRoute: typeof ApiPublicNourWeeklyRoute
   ApiPublicGscCallbackRoute: typeof ApiPublicGscCallbackRoute
 }
@@ -574,6 +588,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EmployeesIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/nour-automations': {
+      id: '/api/public/nour-automations'
+      path: '/api/public/nour-automations'
+      fullPath: '/api/public/nour-automations'
+      preLoaderRoute: typeof ApiPublicNourAutomationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/nour-weekly': {
       id: '/api/public/nour-weekly'
       path: '/api/public/nour-weekly'
@@ -649,6 +670,7 @@ const rootRouteChildren: RootRouteChildren = {
   EmployeesIdRoute: EmployeesIdRoute,
   BlogIndexRoute: BlogIndexRoute,
   EmployeesIndexRoute: EmployeesIndexRoute,
+  ApiPublicNourAutomationsRoute: ApiPublicNourAutomationsRoute,
   ApiPublicNourWeeklyRoute: ApiPublicNourWeeklyRoute,
   ApiPublicGscCallbackRoute: ApiPublicGscCallbackRoute,
 }
