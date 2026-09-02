@@ -66,7 +66,9 @@ export async function keywordExpansion(seed: string): Promise<{
   ]);
   const all = [...base, ...bing, ...mods.flat()];
   const unique = Array.from(new Set(all.map((s) => s.trim()).filter(Boolean)));
-  const questions = unique.filter((s) => /^(كيف|ما|هل|أين|لماذا|متى|من)\b/.test(s));
+  const questions = unique.filter((s) =>
+    /^(كيف|ما|ماهو|ما هو|هل|أين|اين|لماذا|ليه|متى|مين|من هو|كم)\s/.test(s),
+  );
   return {
     seed,
     suggestions: unique.filter((s) => !questions.includes(s)).slice(0, 30),
