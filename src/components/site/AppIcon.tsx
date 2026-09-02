@@ -44,7 +44,7 @@ const map: Record<string, { icon?: Icon; label: string }> = {
   canva: { icon: siCanva, label: "كانفا" },
   analytics: { icon: si.siGoogleanalytics, label: "جوجل أناليتكس" },
   "search-console": { icon: si.siGooglesearchconsole, label: "سيرش كونسول" },
-  indexnow: { icon: si.siBing, label: "IndexNow" },
+  indexnow: { icon: si.siGooglesearchconsole, label: "IndexNow" },
   "meta-ads": { icon: si.siMeta, label: "إعلانات ميتا" },
   telegram: { icon: si.siTelegram, label: "تيليجرام" },
   stripe: { icon: si.siStripe, label: "سترايب" },
