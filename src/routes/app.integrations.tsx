@@ -1,12 +1,16 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { ShieldCheck, RefreshCw, Loader2 } from "lucide-react";
 
 import { AppShell } from "@/components/app/AppShell";
 import { AppIcon, appLabel } from "@/components/site/AppIcon";
+import { WordPressConnect } from "@/components/app/WordPressConnect";
 import { team } from "@/data/team";
 import { integrationStatusLabel } from "@/data/app";
 import { useIntegrations, useSetIntegrationStatus, useWorkspace } from "@/lib/data";
+import { disconnectProvider } from "@/lib/integrations.functions";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/integrations")({
@@ -20,17 +24,42 @@ export const Route = createFileRoute("/app/integrations")({
   component: IntegrationsPage,
 });
 
+/** المنصات المربوطة ربطاً حقيقياً (لا محاكاة). */
+const realProviders = new Set(["wordpress"]);
+
 function IntegrationsPage() {
+  const qc = useQueryClient();
   const { data: workspace } = useWorkspace();
   const { data: integrations, isLoading } = useIntegrations(workspace?.id);
   const setStatus = useSetIntegrationStatus(workspace?.id);
+  const disconnect = useServerFn(disconnectProvider);
   const [busy, setBusy] = useState<string | null>(null);
+  const [wpOpen, setWpOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const all = integrations ?? [];
   const connected = all.filter((i) => i.status === "connected").length;
   const broken = all.filter((i) => i.status === "error");
 
   const toggle = async (id: string, status: string, provider: string) => {
+    setError(null);
+    if (realProviders.has(provider)) {
+      if (status !== "connected") {
+        if (provider === "wordpress") setWpOpen(true);
+        return;
+      }
+      setBusy(id);
+      try {
+        await disconnect({ data: { workspaceId: workspace!.id, provider } });
+        void qc.invalidateQueries({ queryKey: ["integrations", workspace?.id] });
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "تعذّر فصل الحساب");
+      } finally {
+        setBusy(null);
+      }
+      return;
+    }
+
     setBusy(id);
     try {
       if (status === "connected") {
@@ -46,6 +75,7 @@ function IntegrationsPage() {
       setBusy(null);
     }
   };
+
 
   return (
     <AppShell
