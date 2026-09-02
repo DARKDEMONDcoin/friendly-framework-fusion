@@ -78,42 +78,160 @@ export async function keywordExpansion(seed: string): Promise<{
 
 export type SerpResult = { rank: number; title: string; url: string; snippet: string };
 
-/** نتائج بحث حقيقية عبر DuckDuckGo HTML (مجاني، بلا مفتاح). */
-export async function serpSearch(query: string, region = "xa-ar"): Promise<SerpResult[]> {
+async function getText(url: string, ms = 12_000): Promise<string> {
   try {
-    const res = await fetch("https://html.duckduckgo.com/html/", {
-      method: "POST",
-      headers: {
-        "User-Agent": UA,
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Accept-Language": "ar,en;q=0.8",
-      },
-      body: new URLSearchParams({ q: query, kl: region }),
-      signal: timeout(12_000),
+    const res = await fetch(url, {
+      headers: { "User-Agent": UA, "Accept-Language": "ar,en;q=0.8" },
+      signal: timeout(ms),
     });
-    if (!res.ok) return [];
-    const html = await res.text();
-    const results: SerpResult[] = [];
-    const blockRe =
-      /<a[^>]*class="[^"]*result__a[^"]*"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>([\s\S]*?)(?=<a[^>]*class="[^"]*result__a|<\/div>\s*<\/div>\s*<\/div>|$)/g;
-    let m: RegExpExecArray | null;
-    while ((m = blockRe.exec(html)) && results.length < 10) {
-      let href = decodeEntities(m[1] ?? "");
-      const uddg = /[?&]uddg=([^&]+)/.exec(href);
-      if (uddg?.[1]) href = decodeURIComponent(uddg[1]);
-      if (!/^https?:\/\//.test(href)) continue;
-      const snippetMatch = /class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/a>/.exec(m[3] ?? "");
-      results.push({
-        rank: results.length + 1,
-        title: strip(m[2] ?? "").slice(0, 200),
-        url: href,
-        snippet: strip(snippetMatch?.[1] ?? "").slice(0, 300),
-      });
-    }
-    return results;
+    if (!res.ok) return "";
+    return await res.text();
   } catch {
-    return [];
+    return "";
   }
+}
+
+/**
+ * نتائج بحث عامة (أفضل جهد) من مصادر مجانية بلا مفاتيح.
+ * إن رفضت كل المصادر الطلب تُعيد قائمة فارغة، وتعتمد نور على المصادر الأخرى بدل اختلاق نتائج.
+ */
+export async function serpSearch(query: string): Promise<SerpResult[]> {
+  const attempts: (() => Promise<SerpResult[]>)[] = [
+    // 1) DuckDuckGo Lite
+    async () => {
+      const html = await getText(
+        `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(query)}&kl=xa-ar`,
+      );
+      const out: SerpResult[] = [];
+      const rx = /<a[^>]+class="result-link"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
+      let m: RegExpExecArray | null;
+      while ((m = rx.exec(html)) && out.length < 10) {
+        let href = decodeEntities(m[1] ?? "");
+        const uddg = /[?&]uddg=([^&]+)/.exec(href);
+        if (uddg?.[1]) href = decodeURIComponent(uddg[1]);
+        if (!/^https?:\/\//.test(href)) continue;
+        out.push({ rank: out.length + 1, title: strip(m[2] ?? "").slice(0, 200), url: href, snippet: "" });
+      }
+      return out;
+    },
+    // 2) Mojeek (محرك مستقل يسمح بالقراءة)
+    async () => {
+      const html = await getText(`https://www.mojeek.com/search?q=${encodeURIComponent(query)}`);
+      const out: SerpResult[] = [];
+      const rx = /<a[^>]+class="title"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
+      let m: RegExpExecArray | null;
+      while ((m = rx.exec(html)) && out.length < 10) {
+        const href = decodeEntities(m[1] ?? "");
+        if (!/^https?:\/\//.test(href)) continue;
+        out.push({ rank: out.length + 1, title: strip(m[2] ?? "").slice(0, 200), url: href, snippet: "" });
+      }
+      return out;
+    },
+    // 3) ويكيبيديا العربية: مصدر مرجعي مضمون لتغطية المفاهيم
+    async () => {
+      const json = await getText(
+        `https://ar.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&srlimit=5&origin=*`,
+      );
+      if (!json.trim().startsWith("{")) return [];
+      const data = JSON.parse(json) as {
+        query?: { search?: { title: string; snippet: string }[] };
+      };
+      return (data.query?.search ?? []).map((r, i) => ({
+        rank: i + 1,
+        title: r.title,
+        url: `https://ar.wikipedia.org/wiki/${encodeURIComponent(r.title.replace(/ /g, "_"))}`,
+        snippet: strip(r.snippet).slice(0, 300),
+      }));
+    },
+  ];
+
+  for (const attempt of attempts) {
+    try {
+      const results = await attempt();
+      if (results.length) return results;
+    } catch {
+      // نتابع للمصدر التالي
+    }
+  }
+  return [];
+}
+
+export type CompetitorInventory = {
+  domain: string;
+  sitemaps: string[];
+  urlCount: number;
+  samples: { url: string; slug: string }[];
+  topics: string[];
+  error?: string;
+};
+
+/** جرد محتوى منافس من robots.txt وخرائط الموقع — مجاني ودقيق. */
+export async function competitorInventory(domainOrUrl: string): Promise<CompetitorInventory> {
+  const base = (() => {
+    try {
+      const u = new URL(/^https?:\/\//.test(domainOrUrl) ? domainOrUrl : `https://${domainOrUrl}`);
+      return `${u.protocol}//${u.host}`;
+    } catch {
+      return "";
+    }
+  })();
+  if (!base) return { domain: domainOrUrl, sitemaps: [], urlCount: 0, samples: [], topics: [], error: "نطاق غير صالح" };
+
+  const robots = await getText(`${base}/robots.txt`, 8000);
+  let sitemaps = [...robots.matchAll(/Sitemap:\s*(\S+)/gi)]
+    .map((m) => m[1]!)
+    .filter((s) => /^https?:\/\//.test(s))
+    .slice(0, 3);
+  if (!sitemaps.length) sitemaps = [`${base}/sitemap.xml`];
+
+  const urls: string[] = [];
+  const seen = new Set<string>();
+  const queue = [...sitemaps];
+  let fetched = 0;
+  while (queue.length && urls.length < 120 && fetched < 6) {
+    const next = queue.shift()!;
+    if (seen.has(next)) continue;
+    seen.add(next);
+    const xml = await getText(next, 10_000);
+    fetched += 1;
+    const locs = [...xml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/g)].map((m) => m[1]!);
+    for (const loc of locs) {
+      if (/\.xml(\.gz)?$/i.test(loc)) {
+        if (queue.length < 6) queue.push(loc);
+      } else if (urls.length < 120) {
+        urls.push(loc);
+      }
+    }
+  }
+
+  const slugOf = (u: string) => {
+    try {
+      const path = decodeURIComponent(new URL(u).pathname);
+      return path.split("/").filter(Boolean).pop()?.replace(/[-_]+/g, " ").slice(0, 120) ?? "";
+    } catch {
+      return "";
+    }
+  };
+  const samples = urls.slice(0, 40).map((u) => ({ url: u, slug: slugOf(u) }));
+  const words = new Map<string, number>();
+  for (const s of samples) {
+    for (const w of s.slug.split(/\s+/)) {
+      if (w.length > 2) words.set(w, (words.get(w) ?? 0) + 1);
+    }
+  }
+  const topics = [...words.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 15)
+    .map(([w, c]) => `${w} (${c})`);
+
+  return {
+    domain: base,
+    sitemaps,
+    urlCount: urls.length,
+    samples: samples.slice(0, 20),
+    topics,
+    ...(urls.length ? {} : { error: "لم أجد خريطة موقع مقروءة" }),
+  };
 }
 
 export type PageAudit = {
