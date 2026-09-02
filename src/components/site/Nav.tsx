@@ -118,10 +118,10 @@ export function Nav({ variant = "over" }: { variant?: "over" | "solid" }) {
           <li>
             <Link
               onClick={() => setOpen(false)}
-              to="/login"
+              to="/contact"
               className="mt-1 block rounded-xl bg-foreground px-3 py-2.5 text-center font-bold text-background"
             >
-              ابدأ مجاناً
+              اطلب حسابك
             </Link>
           </li>
         </ul>
