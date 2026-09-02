@@ -168,7 +168,7 @@ async function serpToDb(query: string, results: SerpResult[]): Promise<void> {
     await supabaseAdmin.from("serp_cache").upsert(
       {
         cache_key: `serp:${query}`,
-        payload: { results } as unknown as Record<string, unknown>,
+        payload: { results } as unknown as never,
         created_at: new Date().toISOString(),
       },
       { onConflict: "cache_key" },
