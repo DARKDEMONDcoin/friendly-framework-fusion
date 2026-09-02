@@ -82,6 +82,16 @@ function IntegrationsPage() {
       title="التكاملات"
       lead={`${connected} حساباً مرتبطاً · حساب واحد لكل منصة داخل مساحة العمل`}
     >
+      {wpOpen && workspace ? (
+        <WordPressConnect workspaceId={workspace.id} onClose={() => setWpOpen(false)} />
+      ) : null}
+
+      {error ? (
+        <p className="mb-6 rounded-2xl bg-coral/12 px-4 py-3 text-sm font-semibold text-coral">
+          {error}
+        </p>
+      ) : null}
+
       {broken.length ? (
         <div className="mb-6 flex flex-wrap items-center gap-3 rounded-2xl border border-coral/30 bg-coral/8 p-4">
           <RefreshCw className="size-5 shrink-0 text-coral" />
@@ -90,6 +100,7 @@ function IntegrationsPage() {
           </p>
         </div>
       ) : null}
+
 
       {isLoading ? (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
