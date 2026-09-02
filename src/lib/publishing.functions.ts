@@ -312,3 +312,49 @@ export const publishToWebflow = createServerFn({ method: "POST" })
     await logPublished(admin, data.workspaceId, "webflow", data.title, null, data.status === "publish");
     return { ok: true as const, id: created.id ?? null };
   });
+
+/* ————— Ghost (Admin API — مجاني مع أي تنصيب Ghost) ————— */
+
+type GhostStored = { apiUrl: string; adminKey: string };
+
+export const connectGhost = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        workspaceId: z.string().uuid(),
+        apiUrl: z.string().min(6).max(300),
+        adminKey: z.string().min(20).max(300),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const admin = await assertOwner(context.supabase, data.workspaceId);
+    const { ghostSite } = await import("./ghost.server");
+    const config: GhostStored = { apiUrl: data.apiUrl.trim(), adminKey: data.adminKey.trim() };
+    const title = await ghostSite(config);
+    const account = `Ghost · ${title}`;
+    await saveConnection(admin, data.workspaceId, "ghost", config, account);
+    return { ok: true as const, account };
+  });
+
+export const publishToGhost = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        workspaceId: z.string().uuid(),
+        title: z.string().min(2).max(200),
+        content: z.string().min(20).max(200_000),
+        status: z.enum(["draft", "publish"]).default("draft"),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const admin = await assertOwner(context.supabase, data.workspaceId);
+    const config = await loadConfig<GhostStored>(admin, data.workspaceId, "ghost");
+    const { ghostPublish } = await import("./ghost.server");
+    const post = await ghostPublish(config, { title: data.title, html: data.content }, data.status);
+    await logPublished(admin, data.workspaceId, "ghost", data.title, post.url, data.status === "publish");
+    return { ok: true as const, id: post.id, link: post.url };
+  });

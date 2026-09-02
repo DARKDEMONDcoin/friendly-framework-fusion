@@ -26,14 +26,17 @@ import { Route as StoriesRouteImport } from './routes/stories'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AppApprovalsRouteImport } from './routes/app.approvals'
+import { Route as AppAutomationsRouteImport } from './routes/app.automations'
 import { Route as AppBrainRouteImport } from './routes/app.brain'
 import { Route as AppIntegrationsRouteImport } from './routes/app.integrations'
+import { Route as AppReportsRouteImport } from './routes/app.reports'
 import { Route as AppSettingsRouteImport } from './routes/app.settings'
 import { Route as AppTasksRouteImport } from './routes/app.tasks'
 import { Route as BlogIndexRouteImport } from './routes/blog.index'
 import { Route as BlogSlugRouteImport } from './routes/blog.$slug'
 import { Route as EmployeesIndexRouteImport } from './routes/employees.index'
 import { Route as EmployeesIdRouteImport } from './routes/employees.$id'
+import { Route as ApiPublicNourAutomationsRouteImport } from './routes/api/public/nour-automations'
 import { Route as ApiPublicNourWeeklyRouteImport } from './routes/api/public/nour-weekly'
 import { Route as AppChatIndexRouteImport } from './routes/app.chat.index'
 import { Route as AppChatIdRouteImport } from './routes/app.chat.$id'
@@ -124,6 +127,11 @@ const AppApprovalsRoute = AppApprovalsRouteImport.update({
   path: '/approvals',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAutomationsRoute = AppAutomationsRouteImport.update({
+  id: '/automations',
+  path: '/automations',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppBrainRoute = AppBrainRouteImport.update({
   id: '/brain',
   path: '/brain',
@@ -132,6 +140,11 @@ const AppBrainRoute = AppBrainRouteImport.update({
 const AppIntegrationsRoute = AppIntegrationsRouteImport.update({
   id: '/integrations',
   path: '/integrations',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppReportsRoute = AppReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
   getParentRoute: () => AppRoute,
 } as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
@@ -164,6 +177,12 @@ const EmployeesIdRoute = EmployeesIdRouteImport.update({
   path: '/employees/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicNourAutomationsRoute =
+  ApiPublicNourAutomationsRouteImport.update({
+    id: '/api/public/nour-automations',
+    path: '/api/public/nour-automations',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicNourWeeklyRoute = ApiPublicNourWeeklyRouteImport.update({
   id: '/api/public/nour-weekly',
   path: '/api/public/nour-weekly',
@@ -202,8 +221,10 @@ export interface FileRoutesByFullPath {
   '/stories': typeof StoriesRoute
   '/terms': typeof TermsRoute
   '/app/approvals': typeof AppApprovalsRoute
+  '/app/automations': typeof AppAutomationsRoute
   '/app/brain': typeof AppBrainRoute
   '/app/integrations': typeof AppIntegrationsRoute
+  '/app/reports': typeof AppReportsRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/tasks': typeof AppTasksRoute
   '/blog/$slug': typeof BlogSlugRoute
@@ -211,6 +232,7 @@ export interface FileRoutesByFullPath {
   '/app/': typeof AppIndexRoute
   '/blog/': typeof BlogIndexRoute
   '/employees/': typeof EmployeesIndexRoute
+  '/api/public/nour-automations': typeof ApiPublicNourAutomationsRoute
   '/api/public/nour-weekly': typeof ApiPublicNourWeeklyRoute
   '/app/chat/$id': typeof AppChatIdRoute
   '/app/chat/': typeof AppChatIndexRoute
@@ -232,8 +254,10 @@ export interface FileRoutesByTo {
   '/stories': typeof StoriesRoute
   '/terms': typeof TermsRoute
   '/app/approvals': typeof AppApprovalsRoute
+  '/app/automations': typeof AppAutomationsRoute
   '/app/brain': typeof AppBrainRoute
   '/app/integrations': typeof AppIntegrationsRoute
+  '/app/reports': typeof AppReportsRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/tasks': typeof AppTasksRoute
   '/blog/$slug': typeof BlogSlugRoute
@@ -241,6 +265,7 @@ export interface FileRoutesByTo {
   '/app': typeof AppIndexRoute
   '/blog': typeof BlogIndexRoute
   '/employees': typeof EmployeesIndexRoute
+  '/api/public/nour-automations': typeof ApiPublicNourAutomationsRoute
   '/api/public/nour-weekly': typeof ApiPublicNourWeeklyRoute
   '/app/chat/$id': typeof AppChatIdRoute
   '/app/chat': typeof AppChatIndexRoute
@@ -264,8 +289,10 @@ export interface FileRoutesById {
   '/stories': typeof StoriesRoute
   '/terms': typeof TermsRoute
   '/app/approvals': typeof AppApprovalsRoute
+  '/app/automations': typeof AppAutomationsRoute
   '/app/brain': typeof AppBrainRoute
   '/app/integrations': typeof AppIntegrationsRoute
+  '/app/reports': typeof AppReportsRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/tasks': typeof AppTasksRoute
   '/blog/$slug': typeof BlogSlugRoute
@@ -273,6 +300,7 @@ export interface FileRoutesById {
   '/app/': typeof AppIndexRoute
   '/blog/': typeof BlogIndexRoute
   '/employees/': typeof EmployeesIndexRoute
+  '/api/public/nour-automations': typeof ApiPublicNourAutomationsRoute
   '/api/public/nour-weekly': typeof ApiPublicNourWeeklyRoute
   '/app/chat/$id': typeof AppChatIdRoute
   '/app/chat/': typeof AppChatIndexRoute
@@ -297,8 +325,10 @@ export interface FileRouteTypes {
     | '/stories'
     | '/terms'
     | '/app/approvals'
+    | '/app/automations'
     | '/app/brain'
     | '/app/integrations'
+    | '/app/reports'
     | '/app/settings'
     | '/app/tasks'
     | '/blog/$slug'
@@ -306,6 +336,7 @@ export interface FileRouteTypes {
     | '/app/'
     | '/blog/'
     | '/employees/'
+    | '/api/public/nour-automations'
     | '/api/public/nour-weekly'
     | '/app/chat/$id'
     | '/app/chat/'
@@ -327,8 +358,10 @@ export interface FileRouteTypes {
     | '/stories'
     | '/terms'
     | '/app/approvals'
+    | '/app/automations'
     | '/app/brain'
     | '/app/integrations'
+    | '/app/reports'
     | '/app/settings'
     | '/app/tasks'
     | '/blog/$slug'
@@ -336,6 +369,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/blog'
     | '/employees'
+    | '/api/public/nour-automations'
     | '/api/public/nour-weekly'
     | '/app/chat/$id'
     | '/app/chat'
@@ -358,8 +392,10 @@ export interface FileRouteTypes {
     | '/stories'
     | '/terms'
     | '/app/approvals'
+    | '/app/automations'
     | '/app/brain'
     | '/app/integrations'
+    | '/app/reports'
     | '/app/settings'
     | '/app/tasks'
     | '/blog/$slug'
@@ -367,6 +403,7 @@ export interface FileRouteTypes {
     | '/app/'
     | '/blog/'
     | '/employees/'
+    | '/api/public/nour-automations'
     | '/api/public/nour-weekly'
     | '/app/chat/$id'
     | '/app/chat/'
@@ -393,6 +430,7 @@ export interface RootRouteChildren {
   EmployeesIdRoute: typeof EmployeesIdRoute
   BlogIndexRoute: typeof BlogIndexRoute
   EmployeesIndexRoute: typeof EmployeesIndexRoute
+  ApiPublicNourAutomationsRoute: typeof ApiPublicNourAutomationsRoute
   ApiPublicNourWeeklyRoute: typeof ApiPublicNourWeeklyRoute
   ApiPublicGscCallbackRoute: typeof ApiPublicGscCallbackRoute
 }
@@ -518,6 +556,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppApprovalsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/automations': {
+      id: '/app/automations'
+      path: '/automations'
+      fullPath: '/app/automations'
+      preLoaderRoute: typeof AppAutomationsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/brain': {
       id: '/app/brain'
       path: '/brain'
@@ -530,6 +575,13 @@ declare module '@tanstack/react-router' {
       path: '/integrations'
       fullPath: '/app/integrations'
       preLoaderRoute: typeof AppIntegrationsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/reports': {
+      id: '/app/reports'
+      path: '/reports'
+      fullPath: '/app/reports'
+      preLoaderRoute: typeof AppReportsRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/settings': {
@@ -574,6 +626,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EmployeesIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/nour-automations': {
+      id: '/api/public/nour-automations'
+      path: '/api/public/nour-automations'
+      fullPath: '/api/public/nour-automations'
+      preLoaderRoute: typeof ApiPublicNourAutomationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/nour-weekly': {
       id: '/api/public/nour-weekly'
       path: '/api/public/nour-weekly'
@@ -607,8 +666,10 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppApprovalsRoute: typeof AppApprovalsRoute
+  AppAutomationsRoute: typeof AppAutomationsRoute
   AppBrainRoute: typeof AppBrainRoute
   AppIntegrationsRoute: typeof AppIntegrationsRoute
+  AppReportsRoute: typeof AppReportsRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppTasksRoute: typeof AppTasksRoute
   AppIndexRoute: typeof AppIndexRoute
@@ -618,8 +679,10 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppApprovalsRoute: AppApprovalsRoute,
+  AppAutomationsRoute: AppAutomationsRoute,
   AppBrainRoute: AppBrainRoute,
   AppIntegrationsRoute: AppIntegrationsRoute,
+  AppReportsRoute: AppReportsRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppTasksRoute: AppTasksRoute,
   AppIndexRoute: AppIndexRoute,
@@ -649,6 +712,7 @@ const rootRouteChildren: RootRouteChildren = {
   EmployeesIdRoute: EmployeesIdRoute,
   BlogIndexRoute: BlogIndexRoute,
   EmployeesIndexRoute: EmployeesIndexRoute,
+  ApiPublicNourAutomationsRoute: ApiPublicNourAutomationsRoute,
   ApiPublicNourWeeklyRoute: ApiPublicNourWeeklyRoute,
   ApiPublicGscCallbackRoute: ApiPublicGscCallbackRoute,
 }

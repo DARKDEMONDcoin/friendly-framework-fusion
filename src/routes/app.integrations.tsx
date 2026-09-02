@@ -12,6 +12,7 @@ import { IndexNowSetup } from "@/components/app/IndexNowSetup";
 import { Ga4Properties } from "@/components/app/Ga4Properties";
 import { ShopifyConnect } from "@/components/app/ShopifyConnect";
 import { WebflowConnect } from "@/components/app/WebflowConnect";
+import { GhostConnect } from "@/components/app/GhostConnect";
 import { team } from "@/data/team";
 import { integrationStatusLabel } from "@/data/app";
 import { useIntegrations, useSetIntegrationStatus, useWorkspace } from "@/lib/data";
@@ -38,6 +39,7 @@ const realProviders = new Set([
   "analytics",
   "shopify",
   "webflow",
+  "ghost",
 ]);
 
 const gscMessages: Record<string, string> = {
@@ -62,6 +64,7 @@ function IntegrationsPage() {
   const [ga4Open, setGa4Open] = useState(false);
   const [shopifyOpen, setShopifyOpen] = useState(false);
   const [webflowOpen, setWebflowOpen] = useState(false);
+  const [ghostOpen, setGhostOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -98,6 +101,10 @@ function IntegrationsPage() {
         }
         if (provider === "webflow") {
           setWebflowOpen(true);
+          return;
+        }
+        if (provider === "ghost") {
+          setGhostOpen(true);
           return;
         }
         setBusy(id);
@@ -167,6 +174,10 @@ function IntegrationsPage() {
 
       {webflowOpen && workspace ? (
         <WebflowConnect workspaceId={workspace.id} onClose={() => setWebflowOpen(false)} />
+      ) : null}
+
+      {ghostOpen && workspace ? (
+        <GhostConnect workspaceId={workspace.id} onClose={() => setGhostOpen(false)} />
       ) : null}
 
 
