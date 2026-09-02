@@ -139,7 +139,7 @@ function PricingPage() {
                     ))}
                   </ul>
                   <Link
-                    to={p.id === "scale" ? "/contact" : "/signup"}
+                    to={p.id === "scale" ? "/contact" : "/login"}
                     className={
                       p.highlight
                         ? "mt-8 block rounded-full bg-foreground py-3.5 text-center font-bold text-background transition-transform duration-300 hover:-translate-y-1"

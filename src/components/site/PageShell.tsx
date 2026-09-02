@@ -101,7 +101,7 @@ export function CtaBand({
             <p className="mx-auto mt-4 max-w-xl text-lg text-white/90">{lead}</p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
               <Link
-                to="/signup"
+                to="/login"
                 className="group inline-flex items-center gap-2 rounded-full bg-foreground px-8 py-4 font-bold text-background transition-transform duration-300 hover:-translate-y-1"
               >
                 وظّف فريقك الآن

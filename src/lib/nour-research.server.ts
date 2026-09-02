@@ -15,35 +15,39 @@ export type ResearchPlan = {
   useSearchConsole?: boolean;
 };
 
-const OPENROUTER = "https://openrouter.ai/api/v1/chat/completions";
-const FREE_MODELS = [
-  "z-ai/glm-5.2:free",
-  "google/gemini-2.0-flash-exp:free",
-  "meta-llama/llama-3.3-70b-instruct:free",
-];
+const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const MODELS = ["google/gemini-3.7-flash", "google/gemini-3.7-flash-lite"];
 
-/** نداء مجاني للنموذج مع تجاوز تلقائي بين النماذج المجانية. */
+/** نداء النموذج عبر بوابة Lovable AI مع تجاوز تلقائي عند فشل النموذج الأول. */
 export async function freeChat(
   apiKey: string,
   messages: { role: string; content: string }[],
   options: { json?: boolean } = {},
 ): Promise<string> {
-  const res = await fetch(OPENROUTER, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: FREE_MODELS[0],
-      models: FREE_MODELS,
-      route: "fallback",
-      ...(options.json ? { response_format: { type: "json_object" } } : {}),
-      messages,
-    }),
-  });
-  if (res.status === 429) throw new Error("تجاوزت حد الاستخدام مؤقتاً — حاول بعد قليل.");
-  if (res.status === 402) throw new Error("رصيد الذكاء الاصطناعي غير كافٍ — أضف رصيداً للمتابعة.");
-  if (!res.ok) throw new Error(`تعذّر توليد الرد (${res.status}).`);
-  const payload = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-  return payload.choices?.[0]?.message?.content ?? "";
+  let lastError = "";
+  for (const model of MODELS) {
+    const res = await fetch(GATEWAY, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        ...(options.json ? { response_format: { type: "json_object" } } : {}),
+        messages,
+      }),
+    });
+    if (res.status === 429) throw new Error("تجاوزت حد الاستخدام مؤقتاً — حاول بعد قليل.");
+    if (res.status === 402)
+      throw new Error("رصيد الذكاء الاصطناعي غير كافٍ — أضف رصيداً للمتابعة.");
+    if (res.ok) {
+      const payload = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+      const content = payload.choices?.[0]?.message?.content ?? "";
+      if (content.trim()) return content;
+      lastError = "رد فارغ";
+      continue;
+    }
+    lastError = String(res.status);
+  }
+  throw new Error(`تعذّر توليد الرد (${lastError}).`);
 }
 
 export function parseJson<T>(raw: string): T | null {

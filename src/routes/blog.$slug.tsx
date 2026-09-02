@@ -79,7 +79,7 @@ function PostPage() {
               شغّل موظفاً رقمياً واحداً على حسابك، وقارن نتائج أسبوعين.
             </p>
             <Link
-              to="/signup"
+              to="/login"
               className="mt-5 inline-flex rounded-full bg-foreground px-7 py-3.5 font-bold text-background"
             >
               ابدأ مجاناً

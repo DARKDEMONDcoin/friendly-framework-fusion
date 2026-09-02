@@ -66,7 +66,7 @@ export function Nav({ variant = "over" }: { variant?: "over" | "solid" }) {
             تسجيل الدخول
           </Link>
           <Link
-            to="/signup"
+            to="/login"
             className={cn(
               "group relative overflow-hidden rounded-full px-5 py-2.5 text-sm font-bold transition-transform duration-300 hover:-translate-y-0.5",
               solid ? "bg-foreground text-background" : "bg-white text-ink",
@@ -118,7 +118,7 @@ export function Nav({ variant = "over" }: { variant?: "over" | "solid" }) {
           <li>
             <Link
               onClick={() => setOpen(false)}
-              to="/signup"
+              to="/login"
               className="mt-1 block rounded-xl bg-foreground px-3 py-2.5 text-center font-bold text-background"
             >
               ابدأ مجاناً
