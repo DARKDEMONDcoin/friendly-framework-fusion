@@ -199,6 +199,14 @@ export const publishToWordPress = createServerFn({ method: "POST" })
       }),
     })) as { id?: number; link?: string; status?: string };
 
+    // إشعار فوري ومجاني لمحركات البحث (IndexNow) عند النشر الفعلي
+    let indexnow: { submitted: number } | null = null;
+    if (data.status === "publish" && post.link) {
+      const { submitIndexNowFor } = await import("./indexnow.functions");
+      const result = await submitIndexNowFor(admin, data.workspaceId, [post.link]);
+      indexnow = result ? { submitted: result.submitted } : null;
+    }
+
     await admin.from("tasks").insert({
       workspace_id: data.workspaceId,
       employee_id: "nour",
@@ -214,5 +222,6 @@ export const publishToWordPress = createServerFn({ method: "POST" })
       id: post.id ?? null,
       link: post.link ?? null,
       status: post.status ?? data.status,
+      indexnow,
     };
   });
