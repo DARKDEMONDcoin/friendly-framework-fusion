@@ -189,6 +189,10 @@ export const askEmployee = createServerFn({ method: "POST" })
       deliverable = null;
     }
 
+    if (research.used.length) {
+      reply = `${reply.trim()}\n\n— استندتُ إلى بيانات حقيقية: ${research.used.join(" · ")}`;
+    }
+
     const { data: assistantRow, error: assistantError } = await supabase
       .from("messages")
       .insert({
