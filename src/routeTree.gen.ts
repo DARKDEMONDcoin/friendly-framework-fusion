@@ -35,6 +35,7 @@ import { Route as BlogIndexRouteImport } from './routes/blog.index'
 import { Route as BlogSlugRouteImport } from './routes/blog.$slug'
 import { Route as EmployeesIndexRouteImport } from './routes/employees.index'
 import { Route as EmployeesIdRouteImport } from './routes/employees.$id'
+import { Route as ApiPublicNourWeeklyRouteImport } from './routes/api/public/nour-weekly'
 import { Route as AppChatIndexRouteImport } from './routes/app.chat.index'
 import { Route as AppChatIdRouteImport } from './routes/app.chat.$id'
 import { Route as ApiPublicGscCallbackRouteImport } from './routes/api/public/gsc.callback'
@@ -169,6 +170,11 @@ const EmployeesIdRoute = EmployeesIdRouteImport.update({
   path: '/employees/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicNourWeeklyRoute = ApiPublicNourWeeklyRouteImport.update({
+  id: '/api/public/nour-weekly',
+  path: '/api/public/nour-weekly',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppChatIndexRoute = AppChatIndexRouteImport.update({
   id: '/chat/',
   path: '/chat/',
@@ -212,6 +218,7 @@ export interface FileRoutesByFullPath {
   '/app/': typeof AppIndexRoute
   '/blog/': typeof BlogIndexRoute
   '/employees/': typeof EmployeesIndexRoute
+  '/api/public/nour-weekly': typeof ApiPublicNourWeeklyRoute
   '/app/chat/$id': typeof AppChatIdRoute
   '/app/chat/': typeof AppChatIndexRoute
   '/api/public/gsc/callback': typeof ApiPublicGscCallbackRoute
@@ -242,6 +249,7 @@ export interface FileRoutesByTo {
   '/app': typeof AppIndexRoute
   '/blog': typeof BlogIndexRoute
   '/employees': typeof EmployeesIndexRoute
+  '/api/public/nour-weekly': typeof ApiPublicNourWeeklyRoute
   '/app/chat/$id': typeof AppChatIdRoute
   '/app/chat': typeof AppChatIndexRoute
   '/api/public/gsc/callback': typeof ApiPublicGscCallbackRoute
@@ -274,6 +282,7 @@ export interface FileRoutesById {
   '/app/': typeof AppIndexRoute
   '/blog/': typeof BlogIndexRoute
   '/employees/': typeof EmployeesIndexRoute
+  '/api/public/nour-weekly': typeof ApiPublicNourWeeklyRoute
   '/app/chat/$id': typeof AppChatIdRoute
   '/app/chat/': typeof AppChatIndexRoute
   '/api/public/gsc/callback': typeof ApiPublicGscCallbackRoute
@@ -307,6 +316,7 @@ export interface FileRouteTypes {
     | '/app/'
     | '/blog/'
     | '/employees/'
+    | '/api/public/nour-weekly'
     | '/app/chat/$id'
     | '/app/chat/'
     | '/api/public/gsc/callback'
@@ -337,6 +347,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/blog'
     | '/employees'
+    | '/api/public/nour-weekly'
     | '/app/chat/$id'
     | '/app/chat'
     | '/api/public/gsc/callback'
@@ -368,6 +379,7 @@ export interface FileRouteTypes {
     | '/app/'
     | '/blog/'
     | '/employees/'
+    | '/api/public/nour-weekly'
     | '/app/chat/$id'
     | '/app/chat/'
     | '/api/public/gsc/callback'
@@ -394,6 +406,7 @@ export interface RootRouteChildren {
   EmployeesIdRoute: typeof EmployeesIdRoute
   BlogIndexRoute: typeof BlogIndexRoute
   EmployeesIndexRoute: typeof EmployeesIndexRoute
+  ApiPublicNourWeeklyRoute: typeof ApiPublicNourWeeklyRoute
   ApiPublicGscCallbackRoute: typeof ApiPublicGscCallbackRoute
 }
 
@@ -581,6 +594,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EmployeesIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/nour-weekly': {
+      id: '/api/public/nour-weekly'
+      path: '/api/public/nour-weekly'
+      fullPath: '/api/public/nour-weekly'
+      preLoaderRoute: typeof ApiPublicNourWeeklyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/app/chat/': {
       id: '/app/chat/'
       path: '/chat'
@@ -650,6 +670,7 @@ const rootRouteChildren: RootRouteChildren = {
   EmployeesIdRoute: EmployeesIdRoute,
   BlogIndexRoute: BlogIndexRoute,
   EmployeesIndexRoute: EmployeesIndexRoute,
+  ApiPublicNourWeeklyRoute: ApiPublicNourWeeklyRoute,
   ApiPublicGscCallbackRoute: ApiPublicGscCallbackRoute,
 }
 export const routeTree = rootRouteImport
