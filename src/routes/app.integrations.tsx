@@ -134,13 +134,19 @@ function IntegrationsPage() {
                     >
                       <AppIcon name={i.provider} className="size-6 shrink-0" />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-bold">
+                        <span className="flex items-center gap-2 truncate text-sm font-bold">
                           {appLabel(i.provider)}
+                          {realProviders.has(i.provider) ? (
+                            <span className="shrink-0 rounded-full bg-jade/12 px-2 py-0.5 text-[0.65rem] font-bold text-jade-deep">
+                              ربط مباشر
+                            </span>
+                          ) : null}
                         </span>
                         <span className="block truncate text-xs text-muted-foreground">
                           {i.account ?? "لم يُربط بعد"}
                         </span>
                       </span>
+
                       <button
                         onClick={() => void toggle(i.id, i.status, i.provider)}
                         disabled={busy === i.id}
