@@ -4,7 +4,8 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const SCOPE = "https://www.googleapis.com/auth/webmasters.readonly";
+const SCOPE =
+  "https://www.googleapis.com/auth/webmasters.readonly https://www.googleapis.com/auth/analytics.readonly";
 
 export type SearchConsoleConfig = {
   refreshToken: string;
