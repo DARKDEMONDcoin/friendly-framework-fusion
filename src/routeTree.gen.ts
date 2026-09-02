@@ -29,6 +29,7 @@ import { Route as AppApprovalsRouteImport } from './routes/app.approvals'
 import { Route as AppAutomationsRouteImport } from './routes/app.automations'
 import { Route as AppBrainRouteImport } from './routes/app.brain'
 import { Route as AppIntegrationsRouteImport } from './routes/app.integrations'
+import { Route as AppReportsRouteImport } from './routes/app.reports'
 import { Route as AppSettingsRouteImport } from './routes/app.settings'
 import { Route as AppTasksRouteImport } from './routes/app.tasks'
 import { Route as BlogIndexRouteImport } from './routes/blog.index'
@@ -141,6 +142,11 @@ const AppIntegrationsRoute = AppIntegrationsRouteImport.update({
   path: '/integrations',
   getParentRoute: () => AppRoute,
 } as any)
+const AppReportsRoute = AppReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -218,6 +224,7 @@ export interface FileRoutesByFullPath {
   '/app/automations': typeof AppAutomationsRoute
   '/app/brain': typeof AppBrainRoute
   '/app/integrations': typeof AppIntegrationsRoute
+  '/app/reports': typeof AppReportsRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/tasks': typeof AppTasksRoute
   '/blog/$slug': typeof BlogSlugRoute
@@ -250,6 +257,7 @@ export interface FileRoutesByTo {
   '/app/automations': typeof AppAutomationsRoute
   '/app/brain': typeof AppBrainRoute
   '/app/integrations': typeof AppIntegrationsRoute
+  '/app/reports': typeof AppReportsRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/tasks': typeof AppTasksRoute
   '/blog/$slug': typeof BlogSlugRoute
@@ -284,6 +292,7 @@ export interface FileRoutesById {
   '/app/automations': typeof AppAutomationsRoute
   '/app/brain': typeof AppBrainRoute
   '/app/integrations': typeof AppIntegrationsRoute
+  '/app/reports': typeof AppReportsRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/tasks': typeof AppTasksRoute
   '/blog/$slug': typeof BlogSlugRoute
@@ -319,6 +328,7 @@ export interface FileRouteTypes {
     | '/app/automations'
     | '/app/brain'
     | '/app/integrations'
+    | '/app/reports'
     | '/app/settings'
     | '/app/tasks'
     | '/blog/$slug'
@@ -351,6 +361,7 @@ export interface FileRouteTypes {
     | '/app/automations'
     | '/app/brain'
     | '/app/integrations'
+    | '/app/reports'
     | '/app/settings'
     | '/app/tasks'
     | '/blog/$slug'
@@ -384,6 +395,7 @@ export interface FileRouteTypes {
     | '/app/automations'
     | '/app/brain'
     | '/app/integrations'
+    | '/app/reports'
     | '/app/settings'
     | '/app/tasks'
     | '/blog/$slug'
@@ -565,6 +577,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIntegrationsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/reports': {
+      id: '/app/reports'
+      path: '/reports'
+      fullPath: '/app/reports'
+      preLoaderRoute: typeof AppReportsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/settings': {
       id: '/app/settings'
       path: '/settings'
@@ -650,6 +669,7 @@ interface AppRouteChildren {
   AppAutomationsRoute: typeof AppAutomationsRoute
   AppBrainRoute: typeof AppBrainRoute
   AppIntegrationsRoute: typeof AppIntegrationsRoute
+  AppReportsRoute: typeof AppReportsRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppTasksRoute: typeof AppTasksRoute
   AppIndexRoute: typeof AppIndexRoute
@@ -662,6 +682,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAutomationsRoute: AppAutomationsRoute,
   AppBrainRoute: AppBrainRoute,
   AppIntegrationsRoute: AppIntegrationsRoute,
+  AppReportsRoute: AppReportsRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppTasksRoute: AppTasksRoute,
   AppIndexRoute: AppIndexRoute,
