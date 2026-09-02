@@ -142,11 +142,57 @@ function queued<T>(fn: () => Promise<T>, spacingMs = 1_200): Promise<T> {
   return run;
 }
 
+/** مدة صلاحية نتائج البحث المحفوظة: يوم واحد (يخفّف الضغط ويمنع الحجب 429). */
+const SERP_TTL_MS = 24 * 60 * 60 * 1000;
+
+async function serpFromDb(query: string): Promise<SerpResult[] | null> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("serp_cache")
+      .select("payload, created_at")
+      .eq("cache_key", `serp:${query}`)
+      .maybeSingle();
+    if (!data) return null;
+    if (Date.now() - new Date(data.created_at).getTime() > SERP_TTL_MS) return null;
+    const payload = data.payload as { results?: SerpResult[] } | null;
+    return payload?.results?.length ? payload.results : null;
+  } catch {
+    return null;
+  }
+}
+
+async function serpToDb(query: string, results: SerpResult[]): Promise<void> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.from("serp_cache").upsert(
+      {
+        cache_key: `serp:${query}`,
+        payload: { results } as unknown as Record<string, unknown>,
+        created_at: new Date().toISOString(),
+      },
+      { onConflict: "cache_key" },
+    );
+  } catch {
+    // التخزين المؤقت اختياري — لا يعطّل البحث
+  }
+}
+
 export async function serpSearch(query: string): Promise<SerpResult[]> {
   const cached = serpCache.get(query);
   if (cached) return cached;
+
+  const stored = await serpFromDb(query);
+  if (stored) {
+    serpCache.set(query, stored);
+    return stored;
+  }
+
   const results = await queued(() => serpSearchOnce(query));
-  if (results.length) serpCache.set(query, results);
+  if (results.length) {
+    serpCache.set(query, results);
+    await serpToDb(query, results);
+  }
   return results;
 }
 
