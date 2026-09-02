@@ -173,6 +173,9 @@ function ChatPage() {
                   )}
                 >
                   <p>{m.body}</p>
+                  {m.role !== "user" && id === "nour" && workspace && wpConnected && m.body.length > 200 ? (
+                    <PublishToWordPress workspaceId={workspace.id} body={m.body} />
+                  ) : null}
                   <p
                     className={cn(
                       "mt-1.5 text-[0.7rem]",
@@ -181,6 +184,7 @@ function ChatPage() {
                   >
                     {timeOf(m.created_at)}
                   </p>
+
                 </div>
               </div>
             ))}
