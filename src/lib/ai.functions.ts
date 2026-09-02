@@ -3,6 +3,43 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getSkill } from "@/data/skills";
+import { freeChat, gatherEvidence, planResearch } from "@/lib/nour-research.server";
+
+/** الموظفون الذين يعتمدون على بحث حقيقي قبل الإجابة. */
+const RESEARCH_EMPLOYEES = new Set(["nour"]);
+
+/** يجمع أدلة حقيقية مجانية (اقتراحات بحث، نتائج SERP، تحليل صفحات، Search Console). */
+async function researchFor(
+  employeeId: string,
+  apiKey: string,
+  brand: { name: string; industry: string },
+  message: string,
+  workspaceId: string,
+): Promise<{ block: string; used: string[] }> {
+  if (!RESEARCH_EMPLOYEES.has(employeeId)) return { block: "", used: [] };
+  try {
+    const plan = await planResearch(apiKey, brand, message);
+    if (
+      !plan.keywords?.length &&
+      !plan.searches?.length &&
+      !plan.urls?.length &&
+      !plan.useSearchConsole
+    ) {
+      return { block: "", used: [] };
+    }
+    const evidence = await gatherEvidence(plan, workspaceId);
+    return { block: evidence.block, used: evidence.used };
+  } catch (error) {
+    console.error("[nour] research failed:", error);
+    return { block: "", used: [] };
+  }
+}
+
+const evidenceRules = [
+  "استخدم كتلة «أدلة ميدانية» أدناه كمصدر وحيد للأرقام والمنافسين والكلمات — لا تخترع بيانات غيرها.",
+  "اذكر مصدر كل رقم مهم (Search Console، اقتراحات البحث، نتائج البحث، تحليل الصفحة).",
+  "إن كانت الأدلة ناقصة، قل ذلك صراحة واقترح ما يلزم لجمعها.",
+].join("\n");
 
 const personas: Record<string, { name: string; role: string; channel: string; kind: string }> = {
   sonny: {
@@ -104,6 +141,14 @@ export const askEmployee = createServerFn({ method: "POST" })
       .map((b) => `- [${b.kind}] ${b.title}${b.body ? `: ${b.body}` : ""}`)
       .join("\n");
 
+    const research = await researchFor(
+      data.employeeId,
+      apiKey,
+      { name: workspace.name, industry: workspace.industry },
+      data.message,
+      data.workspaceId,
+    );
+
     const system = [
       `أنت ${persona.name}، ${persona.role}`,
       `تعمل داخل منصة «سهل» لصالح العلامة: ${workspace.name} (${workspace.industry}).`,
@@ -112,6 +157,7 @@ export const askEmployee = createServerFn({ method: "POST" })
         ? `كلمات ممنوعة تماماً: ${workspace.banned_words.join("، ")}.`
         : "",
       brainText ? `معرفة العلامة:\n${brainText}` : "",
+      research.block ? `${evidenceRules}\n\n## أدلة ميدانية (لحظية)\n${research.block}` : "",
       "أجب دائماً بالعربية وبإيجاز عملي.",
       'أعد ردك بصيغة JSON فقط بالشكل: {"reply": "نص ردك للمستخدم", "deliverable": {"title": "عنوان المخرج", "kind": "نوع المخرج", "channel": "المنصة", "body": "نص المخرج الجاهز", "scheduled": "متى يُنفّذ"} }',
       'إن لم يطلب المستخدم مخرجاً جاهزاً للنشر أو الإرسال، اجعل "deliverable" القيمة null.',
@@ -125,33 +171,11 @@ export const askEmployee = createServerFn({ method: "POST" })
       .reverse()
       .map((m) => ({ role: m.role === "user" ? "user" : "assistant", content: m.body }));
 
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "z-ai/glm-5.2:free",
-        models: [
-          "z-ai/glm-5.2:free",
-          "google/gemini-2.0-flash-exp:free",
-          "meta-llama/llama-3.3-70b-instruct:free",
-        ],
-        route: "fallback",
-        messages: [
-          { role: "system", content: system },
-          ...priorMessages,
-          { role: "user", content: data.message },
-        ],
-      }),
-    });
-
-    if (res.status === 429) throw new Error("تجاوزت حد الاستخدام مؤقتاً — حاول بعد قليل.");
-    if (res.status === 402) throw new Error("رصيد الذكاء الاصطناعي غير كافٍ — أضف رصيداً للمتابعة.");
-    if (!res.ok) throw new Error(`تعذّر توليد الرد (${res.status}).`);
-
-    const payload = (await res.json()) as {
-      choices?: { message?: { content?: string } }[];
-    };
-    const raw = payload.choices?.[0]?.message?.content ?? "";
+    const raw = await freeChat(apiKey, [
+      { role: "system", content: system },
+      ...priorMessages,
+      { role: "user", content: data.message },
+    ]);
 
     let reply = raw;
     let deliverable: Deliverable | null = null;
@@ -163,6 +187,10 @@ export const askEmployee = createServerFn({ method: "POST" })
       deliverable = parsed.deliverable ?? null;
     } catch {
       deliverable = null;
+    }
+
+    if (research.used.length) {
+      reply = `${reply.trim()}\n\n— استندتُ إلى بيانات حقيقية: ${research.used.join(" · ")}`;
     }
 
     const { data: assistantRow, error: assistantError } = await supabase
@@ -237,6 +265,21 @@ export const runSkill = createServerFn({ method: "POST" })
       .map((b) => `- [${b.kind}] ${b.title}${b.body ? `: ${b.body}` : ""}`)
       .join("\n");
 
+    const prompt = skill.buildPrompt(data.values);
+
+    const requestSummary = Object.entries(data.values)
+      .filter(([, v]) => v?.trim())
+      .map(([k, v]) => `${k}: ${v['length'] > 120 ? `${v.slice(0, 120)}…` : v}`)
+      .join(" · ");
+
+    const research = await researchFor(
+      data.employeeId,
+      apiKey,
+      { name: workspace.name, industry: workspace.industry },
+      `${skill.title}\n${requestSummary}`,
+      data.workspaceId,
+    );
+
     const system = [
       `أنت ${persona.name}، ${persona.role}`,
       `تعمل داخل منصة «سهل» لصالح العلامة: ${workspace.name} (${workspace.industry}).`,
@@ -245,18 +288,12 @@ export const runSkill = createServerFn({ method: "POST" })
         ? `كلمات ممنوعة تماماً: ${workspace.banned_words.join("، ")}.`
         : "",
       brainText ? `معرفة العلامة:\n${brainText}` : "",
+      research.block ? `${evidenceRules}\n\n## أدلة ميدانية (لحظية)\n${research.block}` : "",
       "أنت تنفّذ الآن مهمة محددة وتسلّم مخرجاً نهائياً جاهزاً للاستخدام — لا أسئلة ولا مقدمات ولا اعتذارات.",
       "اكتب بالعربية الفصحى الواضحة، بصيغة Markdown منسّقة، والتزم حرفياً بالهيكل المطلوب.",
     ]
       .filter(Boolean)
       .join("\n");
-
-    const prompt = skill.buildPrompt(data.values);
-
-    const requestSummary = Object.entries(data.values)
-      .filter(([, v]) => v?.trim())
-      .map(([k, v]) => `${k}: ${v['length'] > 120 ? `${v.slice(0, 120)}…` : v}`)
-      .join(" · ");
 
     await supabase.from("messages").insert({
       workspace_id: data.workspaceId,
@@ -265,31 +302,14 @@ export const runSkill = createServerFn({ method: "POST" })
       body: `▸ ${skill.title}${requestSummary ? `\n${requestSummary}` : ""}`,
     });
 
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "z-ai/glm-5.2:free",
-        models: [
-          "z-ai/glm-5.2:free",
-          "google/gemini-2.0-flash-exp:free",
-          "meta-llama/llama-3.3-70b-instruct:free",
-        ],
-        route: "fallback",
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: prompt },
-        ],
-      }),
-    });
-
-    if (res.status === 429) throw new Error("تجاوزت حد الاستخدام مؤقتاً — حاول بعد قليل.");
-    if (res.status === 402) throw new Error("رصيد الذكاء الاصطناعي غير كافٍ — أضف رصيداً للمتابعة.");
-    if (!res.ok) throw new Error(`تعذّر تنفيذ المهمة (${res.status}).`);
-
-    const payload = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-    const output = payload.choices?.[0]?.message?.content?.trim() ?? "";
+    let output = (await freeChat(apiKey, [
+      { role: "system", content: system },
+      { role: "user", content: prompt },
+    ])).trim();
     if (!output) throw new Error("لم يصل مخرج من الموظف — أعد المحاولة.");
+    if (research.used.length) {
+      output = `${output}\n\n> مصادر البيانات: ${research.used.join(" · ")}`;
+    }
 
     const { data: assistantRow, error: assistantError } = await supabase
       .from("messages")

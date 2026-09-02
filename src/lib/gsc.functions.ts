@@ -188,6 +188,58 @@ export const selectSearchConsoleSite = createServerFn({ method: "POST" })
     return { ok: true as const, siteUrl: match.siteUrl };
   });
 
+export type GscRow = {
+  key: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+};
+
+/**
+ * لقطة Search Console للاستخدام الداخلي (بعد التحقق من الملكية عند المنادي).
+ * ترجع null إن لم يكن الربط جاهزاً — حتى لا تتعطل المحادثة.
+ */
+export async function gscSnapshotFor(
+  workspaceId: string,
+  days = 28,
+): Promise<{ site: string; range: { start: string; end: string }; queries: GscRow[]; pages: GscRow[] } | null> {
+  try {
+    const config = await loadConfig(workspaceId);
+    if (!config.siteUrl) return null;
+    const token = await accessToken(config.refreshToken);
+    const end = new Date(Date.now() - 3 * 86_400_000).toISOString().slice(0, 10);
+    const start = new Date(Date.now() - (days + 3) * 86_400_000).toISOString().slice(0, 10);
+
+    const query = async (dimension: "query" | "page"): Promise<GscRow[]> => {
+      const res = await fetch(
+        `https://searchconsole.googleapis.com/webmasters/v3/sites/${encodeURIComponent(config.siteUrl!)}/searchAnalytics/query`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ startDate: start, endDate: end, dimensions: [dimension], rowLimit: 25 }),
+        },
+      );
+      if (!res.ok) return [];
+      const { rows = [] } = (await res.json()) as {
+        rows?: { keys: string[]; clicks: number; impressions: number; ctr: number; position: number }[];
+      };
+      return rows.map((r) => ({
+        key: r.keys[0] ?? "",
+        clicks: r.clicks,
+        impressions: r.impressions,
+        ctr: r.ctr,
+        position: r.position,
+      }));
+    };
+
+    const [queries, pages] = await Promise.all([query("query"), query("page")]);
+    return { site: config.siteUrl, range: { start, end }, queries, pages };
+  } catch {
+    return null;
+  }
+}
+
 /** أعلى الاستعلامات والصفحات في آخر ٢٨ يوماً — بيانات حقيقية لنور. */
 export const searchConsoleSnapshot = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
