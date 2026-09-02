@@ -348,3 +348,117 @@ export async function auditPage(url: string): Promise<PageAudit> {
     return { ...empty, error: error instanceof Error ? error.message : "تعذّر جلب الصفحة" };
   }
 }
+
+export type KeywordMetric = {
+  keyword: string;
+  /** 0-100: مؤشر طلب تقديري مبني على عمق اقتراحات جوجل/بينج الحقيقية. */
+  demandScore: number;
+  /** عدد الاقتراحات التي يعرضها محرك البحث لهذه العبارة. */
+  suggestionDepth: number;
+  /** هل العبارة نفسها تظهر ضمن اقتراحات محرك البحث (دليل طلب فعلي). */
+  autocompleted: boolean;
+  /** 0-100: صعوبة تقديرية مبنية على قوة النطاقات في نتائج البحث الحقيقية. */
+  difficultyScore: number | null;
+  /** نطاقات تتصدر النتائج فعلاً. */
+  topDomains: string[];
+  /** متوسط مشاهدات شهرية لمقال ويكيبيديا العربي الأقرب (اهتمام حقيقي مُقاس). */
+  wikipediaMonthlyViews: number | null;
+  wikipediaArticle: string | null;
+  notes: string[];
+};
+
+const STRONG_DOMAINS = [
+  "wikipedia.org", "youtube.com", "amazon.", "noon.com", "aljazeera.net", "alarabiya.net",
+  "reddit.com", "quora.com", "linkedin.com", "facebook.com", "gov.sa", "gov.ae", "moe.gov",
+];
+
+/** مشاهدات شهرية حقيقية لأقرب مقال ويكيبيديا عربي (Wikimedia REST — مجاني بلا مفتاح). */
+async function wikipediaInterest(
+  keyword: string,
+): Promise<{ article: string; monthlyViews: number } | null> {
+  try {
+    const search = await getText(
+      `https://ar.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(keyword)}&format=json&srlimit=1&origin=*`,
+      8000,
+    );
+    if (!search.trim().startsWith("{")) return null;
+    const title = (JSON.parse(search) as { query?: { search?: { title: string }[] } }).query
+      ?.search?.[0]?.title;
+    if (!title) return null;
+
+    const end = new Date();
+    const start = new Date(end.getTime() - 365 * 86_400_000);
+    const fmt = (d: Date) => `${d.toISOString().slice(0, 10).replace(/-/g, "")}00`;
+    const raw = await getText(
+      `https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/ar.wikipedia/all-access/user/${encodeURIComponent(title.replace(/ /g, "_"))}/monthly/${fmt(start)}/${fmt(end)}`,
+      9000,
+    );
+    if (!raw.trim().startsWith("{")) return null;
+    const items = (JSON.parse(raw) as { items?: { views: number }[] }).items ?? [];
+    if (!items.length) return null;
+    const avg = Math.round(items.reduce((s, i) => s + i.views, 0) / items.length);
+    return { article: title, monthlyViews: avg };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * مقاييس كلمات مفتاحية من مصادر مجانية بالكامل وبلا اختلاق:
+ * عمق الاقتراحات الحقيقية + ظهور العبارة في الإكمال التلقائي + قوة نطاقات النتائج
+ * + مشاهدات ويكيبيديا العربية المقيسة. كل رقم موصوف كتقديري أو مقيس بوضوح.
+ */
+export async function keywordMetrics(keyword: string): Promise<KeywordMetric> {
+  const seed = keyword.trim();
+  const notes: string[] = [];
+  const [google, bing, wiki, serp] = await Promise.all([
+    googleSuggest(seed),
+    bingSuggest(seed),
+    wikipediaInterest(seed),
+    serpSearch(seed),
+  ]);
+
+  const suggestions = Array.from(new Set([...google, ...bing]));
+  const autocompleted = suggestions.some((s) => s.trim() === seed);
+  const suggestionDepth = suggestions.length;
+
+  let demandScore = Math.min(100, suggestionDepth * 5 + (autocompleted ? 25 : 0));
+  if (wiki) demandScore = Math.min(100, demandScore + Math.min(25, Math.round(wiki.monthlyViews / 200)));
+  if (!suggestionDepth) notes.push("لا اقتراحات من محركات البحث لهذه العبارة — طلب ضعيف أو صياغة غير شائعة.");
+
+  const topDomains = Array.from(
+    new Set(
+      serp
+        .map((r) => {
+          try {
+            return new URL(r.url).host.replace(/^www\./, "");
+          } catch {
+            return "";
+          }
+        })
+        .filter(Boolean),
+    ),
+  ).slice(0, 8);
+
+  let difficultyScore: number | null = null;
+  if (topDomains.length) {
+    const strong = topDomains.filter((d) => STRONG_DOMAINS.some((s) => d.includes(s))).length;
+    difficultyScore = Math.min(100, 25 + Math.round((strong / topDomains.length) * 65));
+  } else {
+    notes.push("تعذّر قراءة نتائج البحث الحيّة الآن، فلا تقدير للصعوبة (بدون تخمين).");
+  }
+
+  notes.push("مؤشرات الطلب والصعوبة تقديرية من مصادر مجانية، وليست أرقام حجم بحث من أداة مدفوعة.");
+
+  return {
+    keyword: seed,
+    demandScore,
+    suggestionDepth,
+    autocompleted,
+    difficultyScore,
+    topDomains,
+    wikipediaMonthlyViews: wiki?.monthlyViews ?? null,
+    wikipediaArticle: wiki?.article ?? null,
+    notes,
+  };
+}

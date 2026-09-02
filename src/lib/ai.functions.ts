@@ -137,9 +137,8 @@ export const askEmployee = createServerFn({ method: "POST" })
     });
     if (insertUserError) throw new Error(insertUserError.message);
 
-    const brainText = (brain ?? [])
-      .map((b) => `- [${b.kind}] ${b.title}${b.body ? `: ${b.body}` : ""}`)
-      .join("\n");
+    const { memoryBlock } = await import("./memory.server");
+    const brainText = memoryBlock(brain ?? [], data.message, 8);
 
     const research = await researchFor(
       data.employeeId,
@@ -261,16 +260,15 @@ export const runSkill = createServerFn({ method: "POST" })
     ]);
     if (!workspace) throw new Error("مساحة العمل غير موجودة.");
 
-    const brainText = (brain ?? [])
-      .map((b) => `- [${b.kind}] ${b.title}${b.body ? `: ${b.body}` : ""}`)
-      .join("\n");
-
     const prompt = skill.buildPrompt(data.values);
 
     const requestSummary = Object.entries(data.values)
       .filter(([, v]) => v?.trim())
       .map(([k, v]) => `${k}: ${v['length'] > 120 ? `${v.slice(0, 120)}…` : v}`)
       .join(" · ");
+
+    const { memoryBlock } = await import("./memory.server");
+    const brainText = memoryBlock(brain ?? [], `${skill.title} ${requestSummary}`, 8);
 
     const research = await researchFor(
       data.employeeId,

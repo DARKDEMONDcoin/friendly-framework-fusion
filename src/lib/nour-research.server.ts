@@ -1,5 +1,6 @@
 import {
   keywordExpansion,
+  keywordMetrics,
   serpSearch,
   auditPage,
   competitorInventory,
@@ -141,8 +142,9 @@ export async function gatherEvidence(
   plan: ResearchPlan,
   workspaceId: string,
 ): Promise<Evidence> {
-  const [keywordSets, serpSets, audits, inventories, gsc] = await Promise.all([
+  const [keywordSets, metricSets, serpSets, audits, inventories, gsc] = await Promise.all([
     Promise.all((plan.keywords ?? []).map((k) => keywordExpansion(k))),
+    Promise.all((plan.keywords ?? []).slice(0, 3).map((k) => keywordMetrics(k))),
     Promise.all((plan.searches ?? []).map(async (q) => ({ q, results: await serpSearch(q) }))),
     Promise.all((plan.urls ?? []).map((u) => auditPage(u))),
     Promise.all((plan.competitors ?? []).map((d) => competitorInventory(d))),
@@ -167,6 +169,27 @@ export async function gatherEvidence(
       ]
         .filter(Boolean)
         .join("\n"),
+    );
+  }
+
+  if (metricSets.length) {
+    used.push("مقاييس كلمات مجانية");
+    parts.push(
+      [
+        "### مقاييس الكلمات المفتاحية (مصادر مجانية — تقديرية وموصوفة بصراحة)",
+        ...metricSets.map((m) =>
+          [
+            `- «${m.keyword}»: مؤشر طلب ${m.demandScore}/100 (عمق اقتراحات ${m.suggestionDepth}${m.autocompleted ? "، تظهر في الإكمال التلقائي" : ""})`,
+            m.difficultyScore !== null ? `  صعوبة تقديرية ${m.difficultyScore}/100 | نطاقات متصدرة: ${m.topDomains.join(", ")}` : "  صعوبة: غير متاحة الآن (لا تخمين)",
+            m.wikipediaMonthlyViews !== null
+              ? `  اهتمام مقيس: مقال ويكيبيديا «${m.wikipediaArticle}» ≈ ${m.wikipediaMonthlyViews} مشاهدة/شهر`
+              : "",
+          ]
+            .filter(Boolean)
+            .join("\n"),
+        ),
+        "ملاحظة إلزامية: لا تقدّم هذه الأرقام كحجم بحث شهري من أداة مدفوعة، بل كمؤشرات نسبية للمقارنة والترتيب.",
+      ].join("\n"),
     );
   }
 

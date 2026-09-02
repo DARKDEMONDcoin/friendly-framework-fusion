@@ -1,0 +1,105 @@
+/**
+ * ذاكرة نور: استرجاع دلالي مجاني بالكامل بلا مزوّد embeddings مدفوع.
+ * نستخدم تمثيل حروف/كلمات (n-grams) + وزن TF-IDF مبسّط + تشابه جيب التمام،
+ * وهو ما يمنح استرجاعاً قريباً من الدلالي للعربية (يتحمّل اللواصق والتشكيل).
+ */
+
+const AR_DIACRITICS = /[\u064B-\u0652\u0670\u0640]/g;
+
+/** تطبيع عربي: إزالة التشكيل وتوحيد الألف/الهمزة/التاء المربوطة/الياء. */
+export function normalizeArabic(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(AR_DIACRITICS, "")
+    .replace(/[إأآا]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ة/g, "ه")
+    .replace(/ؤ/g, "و")
+    .replace(/ئ/g, "ي")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const STOP = new Set([
+  "في", "من", "على", "عن", "الى", "الي", "مع", "هذا", "هذه", "ذلك", "التي", "الذي", "او", "و",
+  "ما", "هل", "كل", "بعد", "قبل", "كان", "يكون", "هو", "هي", "ثم", "لكن", "اي", "the", "and",
+  "for", "with", "that", "this",
+]);
+
+/** بصمة نصية: كلمات + ثلاثيات حروف لتقاطع أعمق من المطابقة الحرفية. */
+function features(text: string): Map<string, number> {
+  const norm = normalizeArabic(text);
+  const map = new Map<string, number>();
+  const add = (t: string) => map.set(t, (map.get(t) ?? 0) + 1);
+  const words = norm.split(" ").filter((w) => w.length > 1 && !STOP.has(w));
+  for (const w of words) {
+    add(`w:${w}`);
+    // جذر تقريبي: إزالة "ال" واللواحق الشائعة
+    const stem = w.replace(/^(ال|وال|بال|كال|فال)/, "").replace(/(ات|ون|ين|ية|يه|ها|هم)$/, "");
+    if (stem.length > 2 && stem !== w) add(`w:${stem}`);
+    for (let i = 0; i + 3 <= w.length; i += 1) add(`g:${w.slice(i, i + 3)}`);
+  }
+  for (let i = 0; i + 1 < words.length; i += 1) add(`b:${words[i]} ${words[i + 1]}`);
+  return map;
+}
+
+function cosine(a: Map<string, number>, b: Map<string, number>, idf: Map<string, number>): number {
+  let dot = 0;
+  let na = 0;
+  let nb = 0;
+  for (const [t, v] of a) {
+    const w = (idf.get(t) ?? 1) * v;
+    na += w * w;
+    const bv = b.get(t);
+    if (bv) dot += w * (idf.get(t) ?? 1) * bv;
+  }
+  for (const [t, v] of b) {
+    const w = (idf.get(t) ?? 1) * v;
+    nb += w * w;
+  }
+  if (!na || !nb) return 0;
+  return dot / Math.sqrt(na * nb);
+}
+
+export type MemoryItem = { title: string; body?: string | null; kind?: string | null };
+
+export type RankedMemory = MemoryItem & { score: number };
+
+/**
+ * ترتيب عناصر الذاكرة حسب صلتها الدلالية بالطلب الحالي.
+ * ترجع العناصر الأعلى صلة فقط، مع الإبقاء على العناصر الإلزامية (القواعد/النبرة) دائماً.
+ */
+export function rankMemories(
+  items: MemoryItem[],
+  query: string,
+  limit = 8,
+): RankedMemory[] {
+  if (items.length <= limit) return items.map((i) => ({ ...i, score: 1 }));
+
+  const docs = items.map((i) => features(`${i.title} ${i.body ?? ""} ${i.kind ?? ""}`));
+  const df = new Map<string, number>();
+  for (const d of docs) for (const t of d.keys()) df.set(t, (df.get(t) ?? 0) + 1);
+  const idf = new Map<string, number>();
+  for (const [t, n] of df) idf.set(t, Math.log(1 + items.length / n));
+
+  const q = features(query);
+  const mandatory = /قاعدة|ممنوع|نبرة|إلزامي|الزامي|سياسة/;
+
+  return items
+    .map((item, i) => {
+      const base = cosine(q, docs[i]!, idf);
+      const boost = mandatory.test(`${item.title} ${item.body ?? ""}`) ? 1 : 0;
+      return { ...item, score: base + boost };
+    })
+    .sort((a, b) => b.score - a.score)
+    .filter((r) => r.score > 0.02 || r.score >= 1)
+    .slice(0, limit);
+}
+
+/** نص جاهز للحقن في تعليمات النموذج. */
+export function memoryBlock(items: MemoryItem[], query: string, limit = 8): string {
+  return rankMemories(items, query, limit)
+    .map((b) => `- [${b.kind ?? "note"}] ${b.title}${b.body ? `: ${b.body}` : ""}`)
+    .join("\n");
+}
