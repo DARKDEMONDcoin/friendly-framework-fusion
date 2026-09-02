@@ -33,9 +33,9 @@ function LoginPage() {
       lead="فريقك أنجز مهامّ بينما كنت بعيداً — لنرَ ما ينتظر موافقتك."
       footer={
         <>
-          ليس لديك حساب؟{" "}
-          <Link to="/signup" className="font-bold text-primary">
-            أنشئ حساباً مجاناً
+          للحصول على حساب،{" "}
+          <Link to="/contact" className="font-bold text-primary">
+            تواصل معنا
           </Link>
         </>
       }
