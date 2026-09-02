@@ -1,24 +1,50 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
+import { Nav } from "@/components/site/Nav";
+import { Hero } from "@/components/site/Hero";
+import { Marquee } from "@/components/site/Marquee";
+import { Employees } from "@/components/site/Employees";
+import { Features } from "@/components/site/Features";
+import { HowItWorks } from "@/components/site/HowItWorks";
+import { Testimonials } from "@/components/site/Testimonials";
+import { Pricing } from "@/components/site/Pricing";
+import { Faq } from "@/components/site/Faq";
+import { CtaFooter } from "@/components/site/CtaFooter";
+
 export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "سهل | وظّف فريق موظفين ذكاء اصطناعي يعمل بالعربية 24/7" },
+      {
+        name: "description",
+        content:
+          "سهل: ستة موظفين بالذكاء الاصطناعي باشتراك واحد — ينشرون على 7 منصات، يصممون، يردّون على عملائك، ويتابعون مبيعاتك بالعربية وبلهجتك.",
+      },
+      { property: "og:title", content: "سهل | فريق موظفين ذكاء اصطناعي يعمل بالعربية" },
+      {
+        property: "og:description",
+        content: "موظفون رقميون ينشرون ويصممون ويبيعون نيابة عنك — ابدأ مجاناً بدون بطاقة.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
   component: Index,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
 function Index() {
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
+    <main className="min-h-screen bg-background">
+      <Nav />
+      <Hero />
+      <Marquee />
+      <Employees />
+      <Features />
+      <HowItWorks />
+      <Testimonials />
+      <Pricing />
+      <Faq />
+      <CtaFooter />
+    </main>
   );
 }
