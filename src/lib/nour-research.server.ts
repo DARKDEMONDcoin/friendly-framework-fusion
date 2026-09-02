@@ -123,13 +123,16 @@ export async function gatherEvidence(
   const used: string[] = [];
 
   for (const set of keywordSets) {
-    if (!set.suggestions.length && !set.questions.length) continue;
+    if (!set.suggestions.length) continue;
     used.push(`اقتراحات بحث: ${set.seed}`);
     parts.push(
       [
         `### كلمات يبحث عنها الناس فعلاً حول «${set.seed}» (اقتراحات Google/Bing)`,
-        set.suggestions.length ? `- عبارات: ${set.suggestions.join(" | ")}` : "",
-        set.questions.length ? `- أسئلة: ${set.questions.join(" | ")}` : "",
+        `- عبارات: ${set.suggestions.join(" | ")}`,
+        set.informational.length ? `- نية معلوماتية: ${set.informational.join(" | ")}` : "",
+        set.commercial.length ? `- نية مقارنة: ${set.commercial.join(" | ")}` : "",
+        set.transactional.length ? `- نية شرائية: ${set.transactional.join(" | ")}` : "",
+        set.local.length ? `- نية محلية: ${set.local.join(" | ")}` : "",
       ]
         .filter(Boolean)
         .join("\n"),
