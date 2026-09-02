@@ -4,18 +4,32 @@ import { gscSnapshotFor } from "@/lib/gsc.functions";
 /**
  * حلقة القياس الأسبوعية لنور: تقرأ بيانات Search Console الحقيقية لكل مساحة عمل
  * موصولة، وتحوّلها إلى مهام تحسين ملموسة (فرص ترتيب، ضعف CTR، صفحات متراجعة).
- * محمية بمفتاح LOVABLE_CRON_SECRET عبر ترويسة x-cron-secret.
+ * تُستدعى تلقائياً كل اثنين عبر pg_cron، ومحمية بترويسة x-cron-secret
+ * (إما LOVABLE_CRON_SECRET أو الرمز الداخلي المخزَّن في private.cron_tokens).
  */
 export const Route = createFileRoute("/api/public/nour-weekly")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const secret = process.env["LOVABLE_CRON_SECRET"];
-        if (!secret) return new Response("cron secret missing", { status: 500 });
-        if (request.headers.get("x-cron-secret") !== secret)
-          return new Response("unauthorized", { status: 401 });
+        const provided = request.headers.get("x-cron-secret") ?? "";
+        if (!provided) return new Response("unauthorized", { status: 401 });
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+        const envSecret = process.env["LOVABLE_CRON_SECRET"];
+        let authorized = Boolean(envSecret) && provided === envSecret;
+        if (!authorized) {
+          const { data: tokenRow } = await supabaseAdmin
+            .schema("private")
+            .from("cron_tokens")
+            .select("token")
+            .eq("name", "nour-weekly")
+            .maybeSingle();
+          const dbToken = (tokenRow as { token?: string } | null)?.token;
+          authorized = Boolean(dbToken) && provided === dbToken;
+        }
+        if (!authorized) return new Response("unauthorized", { status: 401 });
+
 
         const { data: connected, error } = await supabaseAdmin
           .from("integrations")
