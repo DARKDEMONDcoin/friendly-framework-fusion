@@ -41,6 +41,7 @@ const map: Record<string, { icon?: Icon; label: string }> = {
   wordpress: { icon: si.siWordpress, label: "ووردبريس" },
   shopify: { icon: si.siShopify, label: "شوبيفاي" },
   webflow: { icon: si.siWebflow, label: "ويبفلو" },
+  ghost: { icon: si.siGhost, label: "غوست" },
   figma: { icon: si.siFigma, label: "فيجما" },
   canva: { icon: siCanva, label: "كانفا" },
   analytics: { icon: si.siGoogleanalytics, label: "جوجل أناليتكس" },
