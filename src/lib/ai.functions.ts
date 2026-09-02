@@ -141,6 +141,14 @@ export const askEmployee = createServerFn({ method: "POST" })
       .map((b) => `- [${b.kind}] ${b.title}${b.body ? `: ${b.body}` : ""}`)
       .join("\n");
 
+    const research = await researchFor(
+      data.employeeId,
+      apiKey,
+      { name: workspace.name, industry: workspace.industry },
+      data.message,
+      data.workspaceId,
+    );
+
     const system = [
       `أنت ${persona.name}، ${persona.role}`,
       `تعمل داخل منصة «سهل» لصالح العلامة: ${workspace.name} (${workspace.industry}).`,
@@ -149,6 +157,7 @@ export const askEmployee = createServerFn({ method: "POST" })
         ? `كلمات ممنوعة تماماً: ${workspace.banned_words.join("، ")}.`
         : "",
       brainText ? `معرفة العلامة:\n${brainText}` : "",
+      research.block ? `${evidenceRules}\n\n## أدلة ميدانية (لحظية)\n${research.block}` : "",
       "أجب دائماً بالعربية وبإيجاز عملي.",
       'أعد ردك بصيغة JSON فقط بالشكل: {"reply": "نص ردك للمستخدم", "deliverable": {"title": "عنوان المخرج", "kind": "نوع المخرج", "channel": "المنصة", "body": "نص المخرج الجاهز", "scheduled": "متى يُنفّذ"} }',
       'إن لم يطلب المستخدم مخرجاً جاهزاً للنشر أو الإرسال، اجعل "deliverable" القيمة null.',
@@ -162,33 +171,11 @@ export const askEmployee = createServerFn({ method: "POST" })
       .reverse()
       .map((m) => ({ role: m.role === "user" ? "user" : "assistant", content: m.body }));
 
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "z-ai/glm-5.2:free",
-        models: [
-          "z-ai/glm-5.2:free",
-          "google/gemini-2.0-flash-exp:free",
-          "meta-llama/llama-3.3-70b-instruct:free",
-        ],
-        route: "fallback",
-        messages: [
-          { role: "system", content: system },
-          ...priorMessages,
-          { role: "user", content: data.message },
-        ],
-      }),
-    });
-
-    if (res.status === 429) throw new Error("تجاوزت حد الاستخدام مؤقتاً — حاول بعد قليل.");
-    if (res.status === 402) throw new Error("رصيد الذكاء الاصطناعي غير كافٍ — أضف رصيداً للمتابعة.");
-    if (!res.ok) throw new Error(`تعذّر توليد الرد (${res.status}).`);
-
-    const payload = (await res.json()) as {
-      choices?: { message?: { content?: string } }[];
-    };
-    const raw = payload.choices?.[0]?.message?.content ?? "";
+    const raw = await freeChat(apiKey, [
+      { role: "system", content: system },
+      ...priorMessages,
+      { role: "user", content: data.message },
+    ]);
 
     let reply = raw;
     let deliverable: Deliverable | null = null;
