@@ -4,7 +4,8 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const SCOPE = "https://www.googleapis.com/auth/webmasters.readonly";
+const SCOPE =
+  "https://www.googleapis.com/auth/webmasters.readonly https://www.googleapis.com/auth/analytics.readonly";
 
 export type SearchConsoleConfig = {
   refreshToken: string;
@@ -83,7 +84,7 @@ export const startSearchConsoleOAuth = createServerFn({ method: "POST" })
     return { url: url.toString(), redirectUri: redirectUri(origin) };
   });
 
-async function accessToken(refreshToken: string): Promise<string> {
+export async function accessToken(refreshToken: string): Promise<string> {
   const { clientId, clientSecret } = googleCreds();
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -103,7 +104,7 @@ async function accessToken(refreshToken: string): Promise<string> {
   return (JSON.parse(text) as { access_token: string }).access_token;
 }
 
-async function loadConfig(workspaceId: string): Promise<SearchConsoleConfig> {
+export async function loadConfig(workspaceId: string): Promise<SearchConsoleConfig> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin
     .from("integration_credentials")
