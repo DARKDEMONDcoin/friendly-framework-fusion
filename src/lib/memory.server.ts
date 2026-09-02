@@ -84,17 +84,22 @@ export function rankMemories(
   for (const [t, n] of df) idf.set(t, Math.log(1 + items.length / n));
 
   const q = features(query);
-  const mandatory = /قاعدة|ممنوع|نبرة|إلزامي|الزامي|سياسة/;
+  const mandatory = /قاعدة|ممنوع|نبرة|إلزامي|الزامي/;
 
-  return items
-    .map((item, i) => {
-      const base = cosine(q, docs[i]!, idf);
-      const boost = mandatory.test(`${item.title} ${item.body ?? ""}`) ? 1 : 0;
-      return { ...item, score: base + boost };
-    })
+  const scored = items.map((item, i) => ({
+    ...item,
+    score: cosine(q, docs[i]!, idf),
+    must: mandatory.test(`${item.title} ${item.body ?? ""}`),
+  }));
+
+  // القواعد الإلزامية تُحفظ دائماً (بحد أقصى 3) ولا تزاحم العناصر الأكثر صلة
+  const musts = scored.filter((r) => r.must).slice(0, 3);
+  const rest = scored
+    .filter((r) => !r.must && r.score > 0.02)
     .sort((a, b) => b.score - a.score)
-    .filter((r) => r.score > 0.02 || r.score >= 1)
-    .slice(0, limit);
+    .slice(0, Math.max(1, limit - musts.length));
+
+  return [...musts, ...rest].map(({ must: _must, ...r }) => r);
 }
 
 /** نص جاهز للحقن في تعليمات النموذج. */
