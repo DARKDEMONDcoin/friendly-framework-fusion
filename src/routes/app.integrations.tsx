@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -7,10 +7,12 @@ import { ShieldCheck, RefreshCw, Loader2 } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { AppIcon, appLabel } from "@/components/site/AppIcon";
 import { WordPressConnect } from "@/components/app/WordPressConnect";
+import { SearchConsoleSites } from "@/components/app/SearchConsoleSites";
 import { team } from "@/data/team";
 import { integrationStatusLabel } from "@/data/app";
 import { useIntegrations, useSetIntegrationStatus, useWorkspace } from "@/lib/data";
 import { disconnectProvider } from "@/lib/integrations.functions";
+import { startSearchConsoleOAuth } from "@/lib/gsc.functions";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/integrations")({
@@ -25,7 +27,15 @@ export const Route = createFileRoute("/app/integrations")({
 });
 
 /** المنصات المربوطة ربطاً حقيقياً (لا محاكاة). */
-const realProviders = new Set(["wordpress"]);
+const realProviders = new Set(["wordpress", "search-console"]);
+
+const gscMessages: Record<string, string> = {
+  denied: "أُلغيت موافقة Google — لم يتم الربط.",
+  token_failed: "تعذّر إكمال الربط مع Google، جرّب مرة أخرى.",
+  no_refresh_token: "لم يمنحنا Google صلاحية دائمة — أعد المحاولة واقبل الصلاحيات.",
+  store_failed: "تعذّر حفظ بيانات الربط.",
+  failed: "تعذّر إكمال الربط.",
+};
 
 function IntegrationsPage() {
   const qc = useQueryClient();
@@ -33,9 +43,19 @@ function IntegrationsPage() {
   const { data: integrations, isLoading } = useIntegrations(workspace?.id);
   const setStatus = useSetIntegrationStatus(workspace?.id);
   const disconnect = useServerFn(disconnectProvider);
+  const startGsc = useServerFn(startSearchConsoleOAuth);
   const [busy, setBusy] = useState<string | null>(null);
   const [wpOpen, setWpOpen] = useState(false);
+  const [gscOpen, setGscOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const status = new URLSearchParams(window.location.search).get("gsc");
+    if (!status) return;
+    if (status === "connected") setGscOpen(true);
+    else setError(gscMessages[status] ?? "تعذّر إكمال ربط Search Console.");
+    window.history.replaceState({}, "", window.location.pathname);
+  }, []);
 
   const all = integrations ?? [];
   const connected = all.filter((i) => i.status === "connected").length;
@@ -45,7 +65,18 @@ function IntegrationsPage() {
     setError(null);
     if (realProviders.has(provider)) {
       if (status !== "connected") {
-        if (provider === "wordpress") setWpOpen(true);
+        if (provider === "wordpress") {
+          setWpOpen(true);
+          return;
+        }
+        setBusy(id);
+        try {
+          const { url } = await startGsc({ data: { workspaceId: workspace!.id } });
+          window.location.href = url;
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "تعذّر بدء الربط مع Google");
+          setBusy(null);
+        }
         return;
       }
       setBusy(id);
@@ -75,6 +106,7 @@ function IntegrationsPage() {
       setBusy(null);
     }
   };
+
 
 
   return (
