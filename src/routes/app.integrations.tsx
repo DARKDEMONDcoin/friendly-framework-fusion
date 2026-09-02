@@ -9,6 +9,7 @@ import { AppIcon, appLabel } from "@/components/site/AppIcon";
 import { WordPressConnect } from "@/components/app/WordPressConnect";
 import { SearchConsoleSites } from "@/components/app/SearchConsoleSites";
 import { IndexNowSetup } from "@/components/app/IndexNowSetup";
+import { Ga4Properties } from "@/components/app/Ga4Properties";
 import { team } from "@/data/team";
 import { integrationStatusLabel } from "@/data/app";
 import { useIntegrations, useSetIntegrationStatus, useWorkspace } from "@/lib/data";
@@ -28,7 +29,7 @@ export const Route = createFileRoute("/app/integrations")({
 });
 
 /** المنصات المربوطة ربطاً حقيقياً (لا محاكاة). */
-const realProviders = new Set(["wordpress", "search-console", "indexnow"]);
+const realProviders = new Set(["wordpress", "search-console", "indexnow", "analytics"]);
 
 const gscMessages: Record<string, string> = {
   denied: "أُلغيت موافقة Google — لم يتم الربط.",
@@ -49,6 +50,7 @@ function IntegrationsPage() {
   const [wpOpen, setWpOpen] = useState(false);
   const [gscOpen, setGscOpen] = useState(false);
   const [indexNowOpen, setIndexNowOpen] = useState(false);
+  const [ga4Open, setGa4Open] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -73,6 +75,10 @@ function IntegrationsPage() {
         }
         if (provider === "indexnow") {
           setIndexNowOpen(true);
+          return;
+        }
+        if (provider === "analytics") {
+          setGa4Open(true);
           return;
         }
         setBusy(id);
@@ -130,6 +136,10 @@ function IntegrationsPage() {
 
       {indexNowOpen && workspace ? (
         <IndexNowSetup workspaceId={workspace.id} onClose={() => setIndexNowOpen(false)} />
+      ) : null}
+
+      {ga4Open && workspace ? (
+        <Ga4Properties workspaceId={workspace.id} onClose={() => setGa4Open(false)} />
       ) : null}
 
 
