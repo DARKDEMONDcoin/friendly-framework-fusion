@@ -52,27 +52,60 @@ export async function bingSuggest(query: string, market = "ar-SA"): Promise<stri
   }
 }
 
-/** توسيع الكلمة المفتاحية: الاقتراح المباشر + أسئلة (كيف/ما/أفضل/سعر/أين) — مجاني. */
-export async function keywordExpansion(seed: string): Promise<{
+export type KeywordExpansion = {
   seed: string;
   suggestions: string[];
-  questions: string[];
-}> {
-  const modifiers = ["كيف", "ما هو", "أفضل", "سعر", "أين", "مقارنة"];
-  const [base, bing, ...mods] = await Promise.all([
+  informational: string[];
+  commercial: string[];
+  transactional: string[];
+  local: string[];
+};
+
+/**
+ * توسيع الكلمة المفتاحية من اقتراحات Google/Bing الحقيقية، مع تصنيف النية:
+ * معلوماتية / مقارنة / شرائية / محلية — مجاني بالكامل.
+ */
+export async function keywordExpansion(seed: string): Promise<KeywordExpansion> {
+  const prefixes = ["طريقة", "أفضل", "سعر", "كم سعر", "شركة", "مقارنة", "أرخص", "هل يجوز"];
+  const suffixes = ["", " ", " في", " بال"];
+  const batches = await Promise.all([
     googleSuggest(seed),
     bingSuggest(seed),
-    ...modifiers.map((m) => googleSuggest(`${m} ${seed}`)),
+    ...prefixes.map((p) => googleSuggest(`${p} ${seed}`)),
+    ...suffixes.map((s) => googleSuggest(`${seed}${s}`)),
   ]);
-  const all = [...base, ...bing, ...mods.flat()];
-  const unique = Array.from(new Set(all.map((s) => s.trim()).filter(Boolean)));
-  const questions = unique.filter((s) =>
-    /^(كيف|ما|ماهو|ما هو|هل|أين|اين|لماذا|ليه|متى|مين|من هو|كم)\s/.test(s),
+
+  const unique = Array.from(
+    new Set(batches.flat().map((s) => s.replace(/\s+/g, " ").trim()).filter((s) => s.length > 2)),
   );
+
+  const has = (s: string, words: string[]) => words.some((w) => s.includes(w));
+  const informational = unique.filter((s) =>
+    has(s, ["كيف", "طريقة", "ما هو", "ماهو", "لماذا", "هل", "خطوات", "فوائد", "أضرار", "معنى"]),
+  );
+  const commercial = unique.filter(
+    (s) => !informational.includes(s) && has(s, ["أفضل", "افضل", "مقارنة", "مقابل", "أم", "تقييم", "مراجعة"]),
+  );
+  const transactional = unique.filter(
+    (s) =>
+      !informational.includes(s) &&
+      !commercial.includes(s) &&
+      has(s, ["سعر", "أسعار", "اسعار", "كم", "شراء", "أرخص", "ارخص", "عرض", "خصم", "شركة", "رقم", "حجز"]),
+  );
+  const local = unique.filter((s) =>
+    has(s, [
+      "الرياض", "جدة", "مكة", "المدينة", "الدمام", "الخبر", "القاهرة", "الإسكندرية", "دبي",
+      "أبوظبي", "الكويت", "الدوحة", "مسقط", "المنامة", "عمان", "قريب", "قرب",
+    ]),
+  );
+
   return {
     seed,
-    suggestions: unique.filter((s) => !questions.includes(s)).slice(0, 30),
-    questions: questions.slice(0, 20),
+    suggestions: unique.slice(0, 40),
+    informational: informational.slice(0, 15),
+    commercial: commercial.slice(0, 15),
+    transactional: transactional.slice(0, 15),
+    local: local.slice(0, 15),
   };
 }
 
