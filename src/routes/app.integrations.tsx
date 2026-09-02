@@ -10,6 +10,8 @@ import { WordPressConnect } from "@/components/app/WordPressConnect";
 import { SearchConsoleSites } from "@/components/app/SearchConsoleSites";
 import { IndexNowSetup } from "@/components/app/IndexNowSetup";
 import { Ga4Properties } from "@/components/app/Ga4Properties";
+import { ShopifyConnect } from "@/components/app/ShopifyConnect";
+import { WebflowConnect } from "@/components/app/WebflowConnect";
 import { team } from "@/data/team";
 import { integrationStatusLabel } from "@/data/app";
 import { useIntegrations, useSetIntegrationStatus, useWorkspace } from "@/lib/data";
@@ -29,7 +31,14 @@ export const Route = createFileRoute("/app/integrations")({
 });
 
 /** المنصات المربوطة ربطاً حقيقياً (لا محاكاة). */
-const realProviders = new Set(["wordpress", "search-console", "indexnow", "analytics"]);
+const realProviders = new Set([
+  "wordpress",
+  "search-console",
+  "indexnow",
+  "analytics",
+  "shopify",
+  "webflow",
+]);
 
 const gscMessages: Record<string, string> = {
   denied: "أُلغيت موافقة Google — لم يتم الربط.",
@@ -51,6 +60,8 @@ function IntegrationsPage() {
   const [gscOpen, setGscOpen] = useState(false);
   const [indexNowOpen, setIndexNowOpen] = useState(false);
   const [ga4Open, setGa4Open] = useState(false);
+  const [shopifyOpen, setShopifyOpen] = useState(false);
+  const [webflowOpen, setWebflowOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -79,6 +90,14 @@ function IntegrationsPage() {
         }
         if (provider === "analytics") {
           setGa4Open(true);
+          return;
+        }
+        if (provider === "shopify") {
+          setShopifyOpen(true);
+          return;
+        }
+        if (provider === "webflow") {
+          setWebflowOpen(true);
           return;
         }
         setBusy(id);
@@ -140,6 +159,14 @@ function IntegrationsPage() {
 
       {ga4Open && workspace ? (
         <Ga4Properties workspaceId={workspace.id} onClose={() => setGa4Open(false)} />
+      ) : null}
+
+      {shopifyOpen && workspace ? (
+        <ShopifyConnect workspaceId={workspace.id} onClose={() => setShopifyOpen(false)} />
+      ) : null}
+
+      {webflowOpen && workspace ? (
+        <WebflowConnect workspaceId={workspace.id} onClose={() => setWebflowOpen(false)} />
       ) : null}
 
 
