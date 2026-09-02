@@ -11,6 +11,8 @@ import { starterPrompts, integrationStatusLabel } from "@/data/app";
 import { useIntegrations, useMessages, useWorkspace } from "@/lib/data";
 import { askEmployee, runSkill } from "@/lib/ai.functions";
 import { SkillRunner } from "@/components/app/SkillRunner";
+import { PublishToWordPress } from "@/components/app/PublishToWordPress";
+
 import { skillsFor, type Skill } from "@/data/skills";
 import { cn } from "@/lib/utils";
 
