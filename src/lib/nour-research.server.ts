@@ -1,10 +1,17 @@
-import { keywordExpansion, serpSearch, auditPage, type SerpResult } from "./seo-research.server";
+import {
+  keywordExpansion,
+  serpSearch,
+  auditPage,
+  competitorInventory,
+  type SerpResult,
+} from "./seo-research.server";
 import { gscSnapshotFor } from "./gsc.functions";
 
 export type ResearchPlan = {
   keywords?: string[];
   searches?: string[];
   urls?: string[];
+  competitors?: string[];
   useSearchConsole?: boolean;
 };
 
@@ -73,8 +80,8 @@ export async function planResearch(
         role: "system",
         content: [
           "أنت مخطِّط بحث لخبيرة سيو عربية. حدّد فقط البيانات الحقيقية اللازمة للإجابة على طلب المستخدم.",
-          'أعد JSON فقط: {"keywords":["كلمة بذرية"],"searches":["استعلام بحث"],"urls":["رابط لتحليله"],"useSearchConsole":true|false}',
-          "قواعد: 0-3 كلمات بذرية، 0-3 استعلامات بحث، 0-2 روابط (فقط إن ذكر المستخدم رابطاً)، واستخدم useSearchConsole=true إذا كان السؤال عن أداء الموقع/الترتيب/النقرات.",
+          'أعد JSON فقط: {"keywords":["كلمة بذرية"],"searches":["استعلام بحث"],"urls":["رابط لتحليله"],"competitors":["نطاق منافس"],"useSearchConsole":true|false}',
+          "قواعد: 0-3 كلمات بذرية، 0-3 استعلامات بحث، 0-2 روابط (فقط إن ذكر المستخدم رابطاً)، 0-2 نطاقات منافسة (فقط إن ذُكرت)، واستخدم useSearchConsole=true إذا كان السؤال عن أداء الموقع/الترتيب/النقرات.",
           "إن كان الطلب عاماً أو محادثة بسيطة، أعد كل الحقول فارغة.",
         ].join("\n"),
       },
@@ -91,6 +98,7 @@ export async function planResearch(
     keywords: clean(plan.keywords, 3),
     searches: clean(plan.searches, 3),
     urls: clean(plan.urls, 2).filter((u) => /^https?:\/\//.test(u)),
+    competitors: clean(plan.competitors, 2),
     useSearchConsole: plan.useSearchConsole === true,
   };
 }
@@ -102,10 +110,11 @@ export async function gatherEvidence(
   plan: ResearchPlan,
   workspaceId: string,
 ): Promise<Evidence> {
-  const [keywordSets, serpSets, audits, gsc] = await Promise.all([
+  const [keywordSets, serpSets, audits, inventories, gsc] = await Promise.all([
     Promise.all((plan.keywords ?? []).map((k) => keywordExpansion(k))),
     Promise.all((plan.searches ?? []).map(async (q) => ({ q, results: await serpSearch(q) }))),
     Promise.all((plan.urls ?? []).map((u) => auditPage(u))),
+    Promise.all((plan.competitors ?? []).map((d) => competitorInventory(d))),
     plan.useSearchConsole ? gscSnapshotFor(workspaceId) : Promise.resolve(null),
   ]);
 
@@ -156,6 +165,21 @@ export async function gatherEvidence(
           ].join("\n"),
     );
     if (!a.error) sources.push(a.url);
+  }
+
+  for (const inv of inventories) {
+    used.push(`جرد منافس: ${inv.domain}`);
+    parts.push(
+      inv.error
+        ? `### جرد ${inv.domain}\n- ${inv.error}`
+        : [
+            `### جرد محتوى المنافس ${inv.domain} (من خريطة الموقع)`,
+            `- عدد الصفحات المكتشفة: ${inv.urlCount}`,
+            `- أكثر الكلمات تكراراً في عناوين الروابط: ${inv.topics.join(" | ")}`,
+            `- نماذج صفحات: ${inv.samples.map((s) => s.slug || s.url).slice(0, 15).join(" | ")}`,
+          ].join("\n"),
+    );
+    if (!inv.error) sources.push(inv.domain);
   }
 
   if (gsc) {
