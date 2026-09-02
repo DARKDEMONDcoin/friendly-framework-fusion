@@ -288,6 +288,10 @@ export type Database = {
     }
     Functions: {
       owns_workspace: { Args: { _workspace_id: string }; Returns: boolean }
+      verify_cron_token: {
+        Args: { _name: string; _token: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
