@@ -108,8 +108,8 @@ export const askEmployee = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => input.parse(data))
   .handler(async ({ data, context }) => {
-    const apiKey = process.env["LOVABLE_API_KEY"];
-    if (!apiKey) throw new Error("مفتاح خدمة الذكاء الاصطناعي غير مهيأ.");
+    const apiKey = process.env["OPENROUTER_API_KEY"];
+    if (!apiKey) throw new Error("مفتاح OpenRouter غير مهيأ.");
 
     const supabase = context.supabase;
     const persona = personas[data.employeeId];
@@ -246,8 +246,8 @@ export const runSkill = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => skillInput.parse(data))
   .handler(async ({ data, context }) => {
-    const apiKey = process.env["LOVABLE_API_KEY"];
-    if (!apiKey) throw new Error("مفتاح خدمة الذكاء الاصطناعي غير مهيأ.");
+    const apiKey = process.env["OPENROUTER_API_KEY"];
+    if (!apiKey) throw new Error("مفتاح OpenRouter غير مهيأ.");
 
     const persona = personas[data.employeeId];
     const skill = getSkill(data.skillId);
