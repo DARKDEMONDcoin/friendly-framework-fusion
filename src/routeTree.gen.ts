@@ -26,6 +26,7 @@ import { Route as StoriesRouteImport } from './routes/stories'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AppApprovalsRouteImport } from './routes/app.approvals'
+import { Route as AppAutomationsRouteImport } from './routes/app.automations'
 import { Route as AppBrainRouteImport } from './routes/app.brain'
 import { Route as AppIntegrationsRouteImport } from './routes/app.integrations'
 import { Route as AppSettingsRouteImport } from './routes/app.settings'
@@ -125,6 +126,11 @@ const AppApprovalsRoute = AppApprovalsRouteImport.update({
   path: '/approvals',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAutomationsRoute = AppAutomationsRouteImport.update({
+  id: '/automations',
+  path: '/automations',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppBrainRoute = AppBrainRouteImport.update({
   id: '/brain',
   path: '/brain',
@@ -209,6 +215,7 @@ export interface FileRoutesByFullPath {
   '/stories': typeof StoriesRoute
   '/terms': typeof TermsRoute
   '/app/approvals': typeof AppApprovalsRoute
+  '/app/automations': typeof AppAutomationsRoute
   '/app/brain': typeof AppBrainRoute
   '/app/integrations': typeof AppIntegrationsRoute
   '/app/settings': typeof AppSettingsRoute
@@ -240,6 +247,7 @@ export interface FileRoutesByTo {
   '/stories': typeof StoriesRoute
   '/terms': typeof TermsRoute
   '/app/approvals': typeof AppApprovalsRoute
+  '/app/automations': typeof AppAutomationsRoute
   '/app/brain': typeof AppBrainRoute
   '/app/integrations': typeof AppIntegrationsRoute
   '/app/settings': typeof AppSettingsRoute
@@ -273,6 +281,7 @@ export interface FileRoutesById {
   '/stories': typeof StoriesRoute
   '/terms': typeof TermsRoute
   '/app/approvals': typeof AppApprovalsRoute
+  '/app/automations': typeof AppAutomationsRoute
   '/app/brain': typeof AppBrainRoute
   '/app/integrations': typeof AppIntegrationsRoute
   '/app/settings': typeof AppSettingsRoute
@@ -307,6 +316,7 @@ export interface FileRouteTypes {
     | '/stories'
     | '/terms'
     | '/app/approvals'
+    | '/app/automations'
     | '/app/brain'
     | '/app/integrations'
     | '/app/settings'
@@ -338,6 +348,7 @@ export interface FileRouteTypes {
     | '/stories'
     | '/terms'
     | '/app/approvals'
+    | '/app/automations'
     | '/app/brain'
     | '/app/integrations'
     | '/app/settings'
@@ -370,6 +381,7 @@ export interface FileRouteTypes {
     | '/stories'
     | '/terms'
     | '/app/approvals'
+    | '/app/automations'
     | '/app/brain'
     | '/app/integrations'
     | '/app/settings'
@@ -532,6 +544,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppApprovalsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/automations': {
+      id: '/app/automations'
+      path: '/automations'
+      fullPath: '/app/automations'
+      preLoaderRoute: typeof AppAutomationsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/brain': {
       id: '/app/brain'
       path: '/brain'
@@ -628,6 +647,7 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppApprovalsRoute: typeof AppApprovalsRoute
+  AppAutomationsRoute: typeof AppAutomationsRoute
   AppBrainRoute: typeof AppBrainRoute
   AppIntegrationsRoute: typeof AppIntegrationsRoute
   AppSettingsRoute: typeof AppSettingsRoute
@@ -639,6 +659,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppApprovalsRoute: AppApprovalsRoute,
+  AppAutomationsRoute: AppAutomationsRoute,
   AppBrainRoute: AppBrainRoute,
   AppIntegrationsRoute: AppIntegrationsRoute,
   AppSettingsRoute: AppSettingsRoute,
