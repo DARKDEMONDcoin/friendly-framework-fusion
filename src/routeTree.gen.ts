@@ -22,7 +22,6 @@ import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as SecurityRouteImport } from './routes/security'
-import { Route as SignupRouteImport } from './routes/signup'
 import { Route as StoriesRouteImport } from './routes/stories'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as AppIndexRouteImport } from './routes/app.index'
@@ -103,11 +102,6 @@ const PrivacyRoute = PrivacyRouteImport.update({
 const SecurityRoute = SecurityRouteImport.update({
   id: '/security',
   path: '/security',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SignupRoute = SignupRouteImport.update({
-  id: '/signup',
-  path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StoriesRoute = StoriesRouteImport.update({
@@ -205,7 +199,6 @@ export interface FileRoutesByFullPath {
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/security': typeof SecurityRoute
-  '/signup': typeof SignupRoute
   '/stories': typeof StoriesRoute
   '/terms': typeof TermsRoute
   '/app/approvals': typeof AppApprovalsRoute
@@ -236,7 +229,6 @@ export interface FileRoutesByTo {
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/security': typeof SecurityRoute
-  '/signup': typeof SignupRoute
   '/stories': typeof StoriesRoute
   '/terms': typeof TermsRoute
   '/app/approvals': typeof AppApprovalsRoute
@@ -269,7 +261,6 @@ export interface FileRoutesById {
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/security': typeof SecurityRoute
-  '/signup': typeof SignupRoute
   '/stories': typeof StoriesRoute
   '/terms': typeof TermsRoute
   '/app/approvals': typeof AppApprovalsRoute
@@ -303,7 +294,6 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/privacy'
     | '/security'
-    | '/signup'
     | '/stories'
     | '/terms'
     | '/app/approvals'
@@ -334,7 +324,6 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/privacy'
     | '/security'
-    | '/signup'
     | '/stories'
     | '/terms'
     | '/app/approvals'
@@ -366,7 +355,6 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/privacy'
     | '/security'
-    | '/signup'
     | '/stories'
     | '/terms'
     | '/app/approvals'
@@ -399,7 +387,6 @@ export interface RootRouteChildren {
   PricingRoute: typeof PricingRoute
   PrivacyRoute: typeof PrivacyRoute
   SecurityRoute: typeof SecurityRoute
-  SignupRoute: typeof SignupRoute
   StoriesRoute: typeof StoriesRoute
   TermsRoute: typeof TermsRoute
   BlogSlugRoute: typeof BlogSlugRoute
@@ -501,13 +488,6 @@ declare module '@tanstack/react-router' {
       path: '/security'
       fullPath: '/security'
       preLoaderRoute: typeof SecurityRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/signup': {
-      id: '/signup'
-      path: '/signup'
-      fullPath: '/signup'
-      preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/stories': {
@@ -663,7 +643,6 @@ const rootRouteChildren: RootRouteChildren = {
   PricingRoute: PricingRoute,
   PrivacyRoute: PrivacyRoute,
   SecurityRoute: SecurityRoute,
-  SignupRoute: SignupRoute,
   StoriesRoute: StoriesRoute,
   TermsRoute: TermsRoute,
   BlogSlugRoute: BlogSlugRoute,
