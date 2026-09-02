@@ -128,10 +128,142 @@ async function getText(url: string, ms = 12_000): Promise<string> {
  * نتائج بحث عامة (أفضل جهد) من مصادر مجانية بلا مفاتيح.
  * إن رفضت كل المصادر الطلب تُعيد قائمة فارغة، وتعتمد نور على المصادر الأخرى بدل اختلاق نتائج.
  */
+const serpCache = new Map<string, SerpResult[]>();
+let serpQueue: Promise<unknown> = Promise.resolve();
+
+/** طابور تسلسلي مع تباعد زمني: يمنع رفض محركات البحث للطلبات المتوازية. */
+function queued<T>(fn: () => Promise<T>, spacingMs = 1_200): Promise<T> {
+  const run = serpQueue.then(async () => {
+    const value = await fn();
+    await new Promise((r) => setTimeout(r, spacingMs));
+    return value;
+  });
+  serpQueue = run.catch(() => undefined);
+  return run;
+}
+
 export async function serpSearch(query: string): Promise<SerpResult[]> {
+  const cached = serpCache.get(query);
+  if (cached) return cached;
+  const results = await queued(() => serpSearchOnce(query));
+  if (results.length) serpCache.set(query, results);
+  return results;
+}
+
+async function serpSearchOnce(query: string): Promise<SerpResult[]> {
   const attempts: (() => Promise<SerpResult[]>)[] = [
-    // 1) DuckDuckGo Lite
+    // 1) Brave Search (نتائج عربية حقيقية بلا مفتاح)
     async () => {
+      const html = await getText(
+        `https://search.brave.com/search?q=${encodeURIComponent(query)}`,
+        15_000,
+      );
+      const out: SerpResult[] = [];
+      const seen = new Set<string>();
+      const rx = /<a href="(https?:\/\/[^"]+)"[^>]*>([\s\S]{0,4000}?)<\/a>/g;
+      let m: RegExpExecArray | null;
+      while ((m = rx.exec(html)) && out.length < 10) {
+        const href = decodeEntities(m[1] ?? "");
+        const block = m[2] ?? "";
+        if (/(^|\.)brave\.com/.test(new URL(href).hostname)) continue;
+        const titleMatch =
+          /class="title[^"]*"[^>]*>([^<]{3,200})</.exec(block) ??
+          /title="([^"]{3,200})"/.exec(block);
+        const title = strip(decodeEntities(titleMatch?.[1] ?? ""));
+        if (!title) continue;
+        const keyUrl = href.split("#")[0]!;
+        if (seen.has(keyUrl)) continue;
+        seen.add(keyUrl);
+        out.push({ rank: out.length + 1, title: title.slice(0, 200), url: keyUrl, snippet: "" });
+      }
+      return out;
+    },
+    // 2) SearXNG عام (JSON) — تدوير بين عدة نسخ مجانية مفتوحة المصدر
+    async () => {
+      const instances = [
+        "https://search.inetol.net",
+        "https://searx.tiekoetter.com",
+        "https://opnxng.com",
+        "https://paulgo.io",
+      ];
+      for (const base of instances) {
+        const raw = await getText(
+          `${base}/search?q=${encodeURIComponent(query)}&format=json&language=ar`,
+          10_000,
+        );
+        if (!raw.trim().startsWith("{")) continue;
+        try {
+          const data = JSON.parse(raw) as {
+            results?: { title?: string; url?: string; content?: string }[];
+          };
+          const rows = (data.results ?? [])
+            .filter((r) => r.url && r.title)
+            .slice(0, 10)
+            .map((r, i) => ({
+              rank: i + 1,
+              title: strip(r.title ?? "").slice(0, 200),
+              url: r.url!,
+              snippet: strip(r.content ?? "").slice(0, 300),
+            }));
+          if (rows.length) return rows;
+        } catch {
+          continue;
+        }
+      }
+      return [];
+    },
+    // 3) Bing (روابط مشفّرة base64 داخل روابط التحويل)
+    async () => {
+      const html = await getText(
+        `https://www.bing.com/search?q=${encodeURIComponent(query)}&setlang=ar`,
+        15_000,
+      );
+      const out: SerpResult[] = [];
+      const seen = new Set<string>();
+      const rx = /<li class="b_algo"[\s\S]{0,8000}?<h2[^>]*>([\s\S]*?)<\/h2>/g;
+      let m: RegExpExecArray | null;
+      while ((m = rx.exec(html)) && out.length < 10) {
+        const chunk = m[0] ?? "";
+        const title = strip(decodeEntities(m[1] ?? "")).slice(0, 200);
+        const enc = /[?&]u=a1([A-Za-z0-9_-]+)/.exec(chunk);
+        let href = "";
+        if (enc?.[1]) {
+          try {
+            href = Buffer.from(enc[1].replace(/-/g, "+").replace(/_/g, "/"), "base64").toString(
+              "utf8",
+            );
+          } catch {
+            href = "";
+          }
+        }
+        if (!/^https?:\/\//.test(href) || !title || seen.has(href)) continue;
+        seen.add(href);
+        out.push({ rank: out.length + 1, title, url: href, snippet: "" });
+      }
+      return out;
+    },
+    // 4) Startpage (نتائج جوجل عبر وسيط مجاني)
+    async () => {
+      const html = await getText(
+        `https://www.startpage.com/sp/search?query=${encodeURIComponent(query)}`,
+        15_000,
+      );
+      const out: SerpResult[] = [];
+      const seen = new Set<string>();
+      const rx = /<a[^>]+class="[^"]*result-link[^"]*"[^>]+href="(https?:\/\/[^"]+)"[^>]*>([\s\S]{0,600}?)<\/a>/g;
+      let m: RegExpExecArray | null;
+      while ((m = rx.exec(html)) && out.length < 10) {
+        const href = decodeEntities(m[1] ?? "");
+        const title = strip(decodeEntities(m[2] ?? "")).slice(0, 200);
+        if (!title || seen.has(href)) continue;
+        seen.add(href);
+        out.push({ rank: out.length + 1, title, url: href, snippet: "" });
+      }
+      return out;
+    },
+    // 5) DuckDuckGo Lite
+    async () => {
+
       const html = await getText(
         `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(query)}&kl=xa-ar`,
       );
@@ -147,7 +279,7 @@ export async function serpSearch(query: string): Promise<SerpResult[]> {
       }
       return out;
     },
-    // 2) Mojeek (محرك مستقل يسمح بالقراءة)
+    // 6) Mojeek (محرك مستقل يسمح بالقراءة)
     async () => {
       const html = await getText(`https://www.mojeek.com/search?q=${encodeURIComponent(query)}`);
       const out: SerpResult[] = [];
@@ -160,27 +292,25 @@ export async function serpSearch(query: string): Promise<SerpResult[]> {
       }
       return out;
     },
-    // 3) ويكيبيديا العربية: مصدر مرجعي مضمون لتغطية المفاهيم
-    async () => {
-      const json = await getText(
-        `https://ar.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&srlimit=5&origin=*`,
-      );
-      if (!json.trim().startsWith("{")) return [];
-      const data = JSON.parse(json) as {
-        query?: { search?: { title: string; snippet: string }[] };
-      };
-      return (data.query?.search ?? []).map((r, i) => ({
-        rank: i + 1,
-        title: r.title,
-        url: `https://ar.wikipedia.org/wiki/${encodeURIComponent(r.title.replace(/ /g, "_"))}`,
-        snippet: strip(r.snippet).slice(0, 300),
-      }));
-    },
   ];
+
+  // فلتر صلة عام: أي نتيجة لا تشترك مع الاستعلام في أي كلمة دالة تُستبعد،
+  // لأن بعض المحركات ترد بنتائج مخزَّنة غير مرتبطة عند حجب الطلب.
+  const tokens = query
+    .split(/\s+/)
+    .map((t) => t.replace(/^(ال|أفضل|افضل|في|من)/, "").trim())
+    .filter((t) => t.length > 2);
+  const relevantOnly = (rows: SerpResult[]) =>
+    tokens.length
+      ? rows.filter((r) => {
+          const hay = `${r.title} ${decodeURIComponent(r.url)} ${r.snippet}`;
+          return tokens.some((t) => hay.includes(t));
+        })
+      : rows;
 
   for (const attempt of attempts) {
     try {
-      const results = await attempt();
+      const results = relevantOnly(await attempt()).map((r, i) => ({ ...r, rank: i + 1 }));
       if (results.length) return results;
     } catch {
       // نتابع للمصدر التالي
@@ -459,6 +589,130 @@ export async function keywordMetrics(keyword: string): Promise<KeywordMetric> {
     topDomains,
     wikipediaMonthlyViews: wiki?.monthlyViews ?? null,
     wikipediaArticle: wiki?.article ?? null,
+    notes,
+  };
+}
+
+export type ContentBrief = {
+  query: string;
+  analyzed: number;
+  medianWordCount: number;
+  targetWordCount: number;
+  headingIdeas: string[];
+  commonTerms: { term: string; pages: number }[];
+  entityGaps: string[];
+  schemaCoverage: number;
+  competitors: { url: string; title: string; words: number; h2: number }[];
+  notes: string[];
+};
+
+const AR_STOP = new Set([
+  "في","من","على","عن","الى","إلى","مع","هذا","هذه","ذلك","التي","الذي","كل","بعد","قبل","هو","هي",
+  "أو","او","ما","لا","إن","ان","كما","بين","حتى","عند","لكن","قد","كان","يكون","the","and","for","with","you","your",
+]);
+
+function terms(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !AR_STOP.has(w));
+}
+
+/**
+ * موجز محتوى مبني على أفضل النتائج الحقيقية للاستعلام (بديل مجاني لأدوات مثل Surfer SEO):
+ * يقيس طول المحتوى المتصدر، العناوين الفرعية المتكررة، المصطلحات/الكيانات التي يغطيها المنافسون،
+ * ونسبة استخدام البيانات المنظمة — كلها من زحف مباشر بلا أي API مدفوع.
+ */
+export async function contentBrief(query: string, ownUrl?: string): Promise<ContentBrief> {
+  const notes: string[] = [];
+  const serp = await serpSearch(query);
+  // نستثني المنصات العامة (موسوعات/فيديو/شبكات) لأنها ليست منافساً محتوائياً قابلاً للقياس
+  const EXCLUDE = [
+    "wikipedia.org","youtube.com","pinterest.","facebook.com","instagram.com",
+    "tiktok.com","x.com","twitter.com","reddit.com","linkedin.com",
+  ];
+  const filtered = serp.filter((r) => {
+    try {
+      const h = new URL(r.url).hostname;
+      return !EXCLUDE.some((d) => h.includes(d));
+    } catch {
+      return false;
+    }
+  });
+  const top = (filtered.length ? filtered : []).slice(0, 6);
+  if (!top.length) {
+    return {
+      query,
+      analyzed: 0,
+      medianWordCount: 0,
+      targetWordCount: 0,
+      headingIdeas: [],
+      commonTerms: [],
+      entityGaps: [],
+      schemaCoverage: 0,
+      competitors: [],
+      notes: ["تعذّر قراءة نتائج البحث الحيّة الآن — لا موجز محتوى (بدون تخمين)."],
+    };
+  }
+
+  const audits = await Promise.all(top.map((r) => auditPage(r.url)));
+  const ok = audits.filter((a) => !a.error && a.wordCount > 150);
+  if (!ok.length) {
+    notes.push("النتائج المتصدرة منعت الزحف، فالموجز مبني على العناوين والمقتطفات فقط.");
+  }
+
+  const words = ok.map((a) => a.wordCount).sort((a, b) => a - b);
+  const medianWordCount = words.length
+    ? (words[Math.floor(words.length / 2)] ?? 0)
+    : 0;
+  const targetWordCount = medianWordCount ? Math.round((medianWordCount * 1.15) / 50) * 50 : 0;
+
+  const headingIdeas = Array.from(
+    new Set(ok.flatMap((a) => a.h2).map((h) => h.trim()).filter((h) => h.length > 8 && h.length < 90)),
+  ).slice(0, 20);
+
+  const freq = new Map<string, Set<string>>();
+  for (const a of ok) {
+    const bag = new Set(terms([a.title, a.metaDescription, ...a.h1, ...a.h2].join(" ")));
+    for (const t of bag) {
+      if (!freq.has(t)) freq.set(t, new Set());
+      freq.get(t)!.add(a.url);
+    }
+  }
+  const commonTerms = Array.from(freq.entries())
+    .map(([term, urls]) => ({ term, pages: urls.size }))
+    .filter((t) => t.pages >= Math.max(2, Math.ceil(ok.length / 2)))
+    .sort((a, b) => b.pages - a.pages)
+    .slice(0, 25);
+
+  let entityGaps: string[] = [];
+  if (ownUrl) {
+    const mine = await auditPage(ownUrl);
+    if (!mine.error) {
+      const own = new Set(terms([mine.title, mine.metaDescription, ...mine.h1, ...mine.h2].join(" ")));
+      entityGaps = commonTerms.filter((t) => !own.has(t.term)).map((t) => t.term).slice(0, 15);
+    } else {
+      notes.push(`تعذّر تحليل صفحتك (${mine.error}) فلا مقارنة فجوات.`);
+    }
+  }
+
+  const schemaCoverage = ok.length
+    ? Math.round((ok.filter((a) => a.hasSchema).length / ok.length) * 100)
+    : 0;
+
+  notes.push("الأرقام مقيسة من الصفحات المتصدرة فعلاً، وليست تقديرات أداة مدفوعة.");
+
+  return {
+    query,
+    analyzed: ok.length,
+    medianWordCount,
+    targetWordCount,
+    headingIdeas,
+    commonTerms,
+    entityGaps,
+    schemaCoverage,
+    competitors: ok.map((a) => ({ url: a.url, title: a.title, words: a.wordCount, h2: a.h2.length })),
     notes,
   };
 }

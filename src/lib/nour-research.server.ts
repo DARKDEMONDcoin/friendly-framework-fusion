@@ -4,6 +4,7 @@ import {
   serpSearch,
   auditPage,
   competitorInventory,
+  contentBrief,
   type SerpResult,
 } from "./seo-research.server";
 import { gscSnapshotFor } from "./gsc.functions";
@@ -143,7 +144,7 @@ export async function gatherEvidence(
   plan: ResearchPlan,
   workspaceId: string,
 ): Promise<Evidence> {
-  const [keywordSets, metricSets, serpSets, audits, inventories, gsc, ga4] = await Promise.all([
+  const [keywordSets, metricSets, serpSets, audits, inventories, gsc, ga4, brief] = await Promise.all([
     Promise.all((plan.keywords ?? []).map((k) => keywordExpansion(k))),
     Promise.all((plan.keywords ?? []).slice(0, 3).map((k) => keywordMetrics(k))),
     Promise.all((plan.searches ?? []).map(async (q) => ({ q, results: await serpSearch(q) }))),
@@ -151,6 +152,9 @@ export async function gatherEvidence(
     Promise.all((plan.competitors ?? []).map((d) => competitorInventory(d))),
     plan.useSearchConsole ? gscSnapshotFor(workspaceId) : Promise.resolve(null),
     plan.useSearchConsole ? ga4SnapshotFor(workspaceId) : Promise.resolve(null),
+    (plan.searches ?? [])[0]
+      ? contentBrief((plan.searches ?? [])[0]!, (plan.urls ?? [])[0])
+      : Promise.resolve(null),
   ]);
 
   const parts: string[] = [];
@@ -275,6 +279,29 @@ export async function gatherEvidence(
           "- لا بيانات",
       ].join("\n"),
     );
+  }
+
+  if (brief && brief.analyzed > 0) {
+    used.push(`موجز محتوى تنافسي: ${brief.query}`);
+    parts.push(
+      [
+        `### موجز محتوى مبني على الصفحات المتصدرة فعلاً لـ «${brief.query}» (${brief.analyzed} صفحة محلّلة)`,
+        `- طول المحتوى الوسيط: ${brief.medianWordCount} كلمة | الطول المستهدف للتفوّق: ${brief.targetWordCount} كلمة`,
+        `- نسبة استخدام البيانات المنظمة بين المتصدرين: ${brief.schemaCoverage}%`,
+        brief.commonTerms.length
+          ? `- مصطلحات/كيانات يغطيها المتصدرون: ${brief.commonTerms.map((t) => `${t.term} (${t.pages})`).join(" | ")}`
+          : "",
+        brief.entityGaps.length ? `- فجوات في صفحتك يجب تغطيتها: ${brief.entityGaps.join(" | ")}` : "",
+        brief.headingIdeas.length
+          ? `- عناوين فرعية مستخدمة فعلاً: ${brief.headingIdeas.slice(0, 12).join(" | ")}`
+          : "",
+        `- المنافسون: ${brief.competitors.map((c) => `${c.url} (${c.words} كلمة، ${c.h2} عنوان فرعي)`).join(" | ")}`,
+        ...brief.notes.map((n) => `- ملاحظة: ${n}`),
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    );
+    sources.push(...brief.competitors.map((c) => c.url));
   }
 
   return { block: parts.join("\n\n"), sources: Array.from(new Set(sources)), used };
