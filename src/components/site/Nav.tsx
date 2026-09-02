@@ -66,13 +66,13 @@ export function Nav({ variant = "over" }: { variant?: "over" | "solid" }) {
             تسجيل الدخول
           </Link>
           <Link
-            to="/login"
+            to="/contact"
             className={cn(
               "group relative overflow-hidden rounded-full px-5 py-2.5 text-sm font-bold transition-transform duration-300 hover:-translate-y-0.5",
               solid ? "bg-foreground text-background" : "bg-white text-ink",
             )}
           >
-            <span className="relative z-10">ابدأ مجاناً</span>
+            <span className="relative z-10">اطلب حسابك</span>
           </Link>
         </div>
 
@@ -118,10 +118,10 @@ export function Nav({ variant = "over" }: { variant?: "over" | "solid" }) {
           <li>
             <Link
               onClick={() => setOpen(false)}
-              to="/login"
+              to="/contact"
               className="mt-1 block rounded-xl bg-foreground px-3 py-2.5 text-center font-bold text-background"
             >
-              ابدأ مجاناً
+              اطلب حسابك
             </Link>
           </li>
         </ul>
