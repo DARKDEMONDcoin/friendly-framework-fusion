@@ -178,7 +178,41 @@ async function serpSearchOnce(query: string): Promise<SerpResult[]> {
       }
       return out;
     },
-    // 2) Bing (روابط مشفّرة base64 داخل روابط التحويل)
+    // 2) SearXNG عام (JSON) — تدوير بين عدة نسخ مجانية مفتوحة المصدر
+    async () => {
+      const instances = [
+        "https://search.inetol.net",
+        "https://searx.tiekoetter.com",
+        "https://opnxng.com",
+        "https://paulgo.io",
+      ];
+      for (const base of instances) {
+        const raw = await getText(
+          `${base}/search?q=${encodeURIComponent(query)}&format=json&language=ar`,
+          10_000,
+        );
+        if (!raw.trim().startsWith("{")) continue;
+        try {
+          const data = JSON.parse(raw) as {
+            results?: { title?: string; url?: string; content?: string }[];
+          };
+          const rows = (data.results ?? [])
+            .filter((r) => r.url && r.title)
+            .slice(0, 10)
+            .map((r, i) => ({
+              rank: i + 1,
+              title: strip(r.title ?? "").slice(0, 200),
+              url: r.url!,
+              snippet: strip(r.content ?? "").slice(0, 300),
+            }));
+          if (rows.length) return rows;
+        } catch {
+          continue;
+        }
+      }
+      return [];
+    },
+    // 3) Bing (روابط مشفّرة base64 داخل روابط التحويل)
     async () => {
       const html = await getText(
         `https://www.bing.com/search?q=${encodeURIComponent(query)}&setlang=ar`,
@@ -208,7 +242,7 @@ async function serpSearchOnce(query: string): Promise<SerpResult[]> {
       }
       return out;
     },
-    // 3) Startpage (نتائج جوجل عبر وسيط مجاني)
+    // 4) Startpage (نتائج جوجل عبر وسيط مجاني)
     async () => {
       const html = await getText(
         `https://www.startpage.com/sp/search?query=${encodeURIComponent(query)}`,
@@ -227,7 +261,7 @@ async function serpSearchOnce(query: string): Promise<SerpResult[]> {
       }
       return out;
     },
-    // 4) DuckDuckGo Lite
+    // 5) DuckDuckGo Lite
     async () => {
 
       const html = await getText(
@@ -245,7 +279,7 @@ async function serpSearchOnce(query: string): Promise<SerpResult[]> {
       }
       return out;
     },
-    // 5) Mojeek (محرك مستقل يسمح بالقراءة)
+    // 6) Mojeek (محرك مستقل يسمح بالقراءة)
     async () => {
       const html = await getText(`https://www.mojeek.com/search?q=${encodeURIComponent(query)}`);
       const out: SerpResult[] = [];
