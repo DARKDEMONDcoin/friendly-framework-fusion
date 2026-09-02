@@ -209,16 +209,6 @@ export function AppShell({
               >
                 <Bell className="size-4.5" />
               </Link>
-              <button
-                onClick={async () => {
-                  await signOut();
-                  void navigate({ to: "/login" });
-                }}
-                className="grid size-10 place-items-center rounded-xl border border-border transition-colors hover:bg-secondary"
-                aria-label="تسجيل الخروج"
-              >
-                <LogOut className="size-4.5" />
-              </button>
               <span className="grid size-10 place-items-center rounded-xl bg-foreground font-display text-sm font-black text-background">
                 {initial}
               </span>
