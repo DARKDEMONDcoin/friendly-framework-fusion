@@ -14,6 +14,71 @@ export type Database = {
   }
   public: {
     Tables: {
+      automations: {
+        Row: {
+          active: boolean
+          auto_publish: boolean
+          cadence: string
+          created_at: string
+          day_of_week: number
+          employee_id: string
+          hour: number
+          id: string
+          label: string
+          last_run_at: string | null
+          last_status: string | null
+          next_run_at: string
+          skill_id: string
+          updated_at: string
+          values: Json
+          workspace_id: string
+        }
+        Insert: {
+          active?: boolean
+          auto_publish?: boolean
+          cadence?: string
+          created_at?: string
+          day_of_week?: number
+          employee_id?: string
+          hour?: number
+          id?: string
+          label: string
+          last_run_at?: string | null
+          last_status?: string | null
+          next_run_at?: string
+          skill_id: string
+          updated_at?: string
+          values?: Json
+          workspace_id: string
+        }
+        Update: {
+          active?: boolean
+          auto_publish?: boolean
+          cadence?: string
+          created_at?: string
+          day_of_week?: number
+          employee_id?: string
+          hour?: number
+          id?: string
+          label?: string
+          last_run_at?: string | null
+          last_status?: string | null
+          next_run_at?: string
+          skill_id?: string
+          updated_at?: string
+          values?: Json
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brain_items: {
         Row: {
           body: string | null
@@ -187,6 +252,24 @@ export type Database = {
           full_name?: string | null
           id?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      serp_cache: {
+        Row: {
+          cache_key: string
+          created_at: string
+          payload: Json
+        }
+        Insert: {
+          cache_key: string
+          created_at?: string
+          payload: Json
+        }
+        Update: {
+          cache_key?: string
+          created_at?: string
+          payload?: Json
         }
         Relationships: []
       }
