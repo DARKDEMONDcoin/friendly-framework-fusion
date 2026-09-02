@@ -11,6 +11,8 @@ import { starterPrompts, integrationStatusLabel } from "@/data/app";
 import { useIntegrations, useMessages, useWorkspace } from "@/lib/data";
 import { askEmployee, runSkill } from "@/lib/ai.functions";
 import { SkillRunner } from "@/components/app/SkillRunner";
+import { PublishToWordPress } from "@/components/app/PublishToWordPress";
+
 import { skillsFor, type Skill } from "@/data/skills";
 import { cn } from "@/lib/utils";
 
@@ -71,6 +73,10 @@ function ChatPage() {
   const employeeSkills = skillsFor(id);
 
   const owned = (integrations ?? []).filter((i) => i.employee_id === id);
+  const wpConnected = (integrations ?? []).some(
+    (i) => i.provider === "wordpress" && i.status === "connected",
+  );
+
 
   const send = useMutation({
     mutationFn: (message: string) =>
@@ -171,6 +177,9 @@ function ChatPage() {
                   )}
                 >
                   <p>{m.body}</p>
+                  {m.role !== "user" && id === "nour" && workspace && wpConnected && m.body.length > 200 ? (
+                    <PublishToWordPress workspaceId={workspace.id} body={m.body} />
+                  ) : null}
                   <p
                     className={cn(
                       "mt-1.5 text-[0.7rem]",
@@ -179,6 +188,7 @@ function ChatPage() {
                   >
                     {timeOf(m.created_at)}
                   </p>
+
                 </div>
               </div>
             ))}
