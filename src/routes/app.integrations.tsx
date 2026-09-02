@@ -8,6 +8,7 @@ import { AppShell } from "@/components/app/AppShell";
 import { AppIcon, appLabel } from "@/components/site/AppIcon";
 import { WordPressConnect } from "@/components/app/WordPressConnect";
 import { SearchConsoleSites } from "@/components/app/SearchConsoleSites";
+import { IndexNowSetup } from "@/components/app/IndexNowSetup";
 import { team } from "@/data/team";
 import { integrationStatusLabel } from "@/data/app";
 import { useIntegrations, useSetIntegrationStatus, useWorkspace } from "@/lib/data";
@@ -27,7 +28,7 @@ export const Route = createFileRoute("/app/integrations")({
 });
 
 /** المنصات المربوطة ربطاً حقيقياً (لا محاكاة). */
-const realProviders = new Set(["wordpress", "search-console"]);
+const realProviders = new Set(["wordpress", "search-console", "indexnow"]);
 
 const gscMessages: Record<string, string> = {
   denied: "أُلغيت موافقة Google — لم يتم الربط.",
@@ -47,6 +48,7 @@ function IntegrationsPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [wpOpen, setWpOpen] = useState(false);
   const [gscOpen, setGscOpen] = useState(false);
+  const [indexNowOpen, setIndexNowOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -67,6 +69,10 @@ function IntegrationsPage() {
       if (status !== "connected") {
         if (provider === "wordpress") {
           setWpOpen(true);
+          return;
+        }
+        if (provider === "indexnow") {
+          setIndexNowOpen(true);
           return;
         }
         setBusy(id);
@@ -120,6 +126,10 @@ function IntegrationsPage() {
 
       {gscOpen && workspace ? (
         <SearchConsoleSites workspaceId={workspace.id} onClose={() => setGscOpen(false)} />
+      ) : null}
+
+      {indexNowOpen && workspace ? (
+        <IndexNowSetup workspaceId={workspace.id} onClose={() => setIndexNowOpen(false)} />
       ) : null}
 
 
