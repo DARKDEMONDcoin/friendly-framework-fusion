@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { Loader2, Wand2, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Loader2, Search, Sparkles, Wand2, X } from "lucide-react";
 
-import type { Skill } from "@/data/skills";
+import type { Skill, SkillCategory } from "@/data/skills";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -15,15 +15,32 @@ function initialValues(skill: Skill) {
   return Object.fromEntries(skill.fields.map((f) => [f.name, f.defaultValue ?? ""]));
 }
 
-export function SkillRunner({ skills, disabled, pending, onRun }: Props) {
+/**
+ * لوحة قدرات احترافية: زر واحد يفتح مُستعرضاً قابلاً للبحث ومجمّعاً بالتصنيفات،
+ * ثم نموذج تنفيذ القدرة — بدل صف طويل من الأزرار فوق مربع الإدخال.
+ */
+export function SkillPalette({ skills, disabled, pending, onRun }: Props) {
+  const [browsing, setBrowsing] = useState(false);
+  const [query, setQuery] = useState("");
   const [open, setOpen] = useState<Skill | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
+
+  const groups = useMemo(() => {
+    const q = query.trim();
+    const list = q
+      ? skills.filter((s) => `${s.title} ${s.summary} ${s.category}`.includes(q))
+      : skills;
+    const map = new Map<SkillCategory, Skill[]>();
+    for (const s of list) map.set(s.category, [...(map.get(s.category) ?? []), s]);
+    return [...map.entries()];
+  }, [skills, query]);
 
   if (skills.length === 0) return null;
 
   const start = (skill: Skill) => {
     setValues(initialValues(skill));
     setOpen(skill);
+    setBrowsing(false);
   };
 
   const ready =
@@ -31,21 +48,76 @@ export function SkillRunner({ skills, disabled, pending, onRun }: Props) {
 
   return (
     <>
-      <div className="mb-3 flex flex-wrap gap-2">
-        {skills.map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            onClick={() => start(s)}
-            disabled={disabled || pending}
-            title={s.summary}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-1.5 text-xs font-semibold transition-colors hover:bg-secondary disabled:opacity-50"
+      <button
+        type="button"
+        onClick={() => setBrowsing(true)}
+        disabled={disabled || pending}
+        className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-xs font-bold transition-colors hover:bg-secondary disabled:opacity-50"
+      >
+        <Sparkles className="size-3.5 text-primary" />
+        القدرات
+        <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[0.65rem] text-muted-foreground">
+          {skills.length}
+        </span>
+      </button>
+
+      {browsing ? (
+        <div
+          className="fixed inset-0 z-50 grid place-items-end bg-foreground/40 p-0 backdrop-blur-sm sm:place-items-center sm:p-4"
+          onClick={() => setBrowsing(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl border border-border bg-card shadow-lift sm:rounded-3xl"
           >
-            <Wand2 className="size-3.5 text-primary" />
-            {s.title}
-          </button>
-        ))}
-      </div>
+            <div className="flex items-center gap-2 border-b border-border p-4">
+              <Search className="size-4 shrink-0 text-muted-foreground" />
+              <input
+                autoFocus
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="ابحث في القدرات…"
+                className="min-w-0 flex-1 bg-transparent outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setBrowsing(false)}
+                className="grid size-9 shrink-0 place-items-center rounded-xl border border-border hover:bg-secondary"
+                aria-label="إغلاق"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              {groups.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">لا نتائج مطابقة.</p>
+              ) : null}
+              {groups.map(([category, list]) => (
+                <section key={category} className="mb-5">
+                  <h3 className="mb-2 text-xs font-black text-muted-foreground">{category}</h3>
+                  <ul className="grid gap-2 sm:grid-cols-2">
+                    {list.map((s) => (
+                      <li key={s.id}>
+                        <button
+                          type="button"
+                          onClick={() => start(s)}
+                          className="w-full rounded-2xl border border-border p-3 text-start transition-colors hover:border-primary hover:bg-secondary/60"
+                        >
+                          <span className="block text-sm font-bold">{s.title}</span>
+                          <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+                            {s.summary}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {open ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 p-4 backdrop-blur-sm">
@@ -84,6 +156,9 @@ export function SkillRunner({ skills, disabled, pending, onRun }: Props) {
                       {f.label}
                       {f.required ? <span className="text-primary"> *</span> : null}
                     </label>
+                    {f.help ? (
+                      <p className="mt-0.5 text-xs text-muted-foreground">{f.help}</p>
+                    ) : null}
                     {f.type === "textarea" ? (
                       <textarea
                         id={id}
@@ -128,7 +203,11 @@ export function SkillRunner({ skills, disabled, pending, onRun }: Props) {
                   (!ready || pending) && "opacity-50",
                 )}
               >
-                {pending ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
+                {pending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Wand2 className="size-4" />
+                )}
                 نفّذ المهمة
               </button>
             </form>

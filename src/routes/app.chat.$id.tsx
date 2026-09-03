@@ -2,15 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Send, Settings2, Sparkles, Loader2 } from "lucide-react";
+import { Send, Settings2, Loader2 } from "lucide-react";
 
 import { AppShell } from "@/components/app/AppShell";
 import { AppIcon, appLabel } from "@/components/site/AppIcon";
 import { getMember } from "@/data/team";
-import { starterPrompts, integrationStatusLabel } from "@/data/app";
+import { integrationStatusLabel } from "@/data/app";
 import { useIntegrations, useMessages, useWorkspace } from "@/lib/data";
 import { askEmployee, runSkill } from "@/lib/ai.functions";
-import { SkillRunner } from "@/components/app/SkillRunner";
+import { SkillPalette } from "@/components/app/SkillPalette";
+import { Markdown } from "@/components/app/Markdown";
 import { PublishToWordPress } from "@/components/app/PublishToWordPress";
 
 import { skillsFor, type Skill } from "@/data/skills";
@@ -68,6 +69,7 @@ function ChatPage() {
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const ask = useServerFn(askEmployee);
   const runSkillFn = useServerFn(runSkill);
   const employeeSkills = skillsFor(id);
@@ -112,6 +114,18 @@ function ChatPage() {
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages?.length, send.isPending, skillRun.isPending]);
+
+  // إبقاء التركيز في مربع الكتابة + تمدد تلقائي لارتفاع النص.
+  useEffect(() => {
+    if (!busy) inputRef.current?.focus();
+  }, [busy, id]);
+
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+  }, [draft]);
 
   const submit = (text: string) => {
     const body = text.trim();
@@ -170,14 +184,18 @@ function ChatPage() {
                 ) : null}
                 <div
                   className={cn(
-                    "max-w-[38rem] rounded-3xl px-5 py-3.5 leading-relaxed whitespace-pre-wrap",
+                    "min-w-0 max-w-[min(46rem,88%)] rounded-3xl px-5 py-3.5 leading-relaxed",
                     m.role === "user"
-                      ? "bg-foreground text-background"
-                      : "border border-border bg-card",
+                      ? "rounded-se-lg bg-foreground text-background whitespace-pre-wrap"
+                      : "rounded-ss-lg border border-border bg-card shadow-sm",
                   )}
                 >
-                  <p>{m.body}</p>
-                  {m.role !== "user" && id === "nour" && workspace && wpConnected && m.body.length > 200 ? (
+                  {m.role === "user" ? <p dir="auto">{m.body}</p> : <Markdown body={m.body} />}
+                  {m.role !== "user" &&
+                  id === "nour" &&
+                  workspace &&
+                  wpConnected &&
+                  m.body.length > 200 ? (
                     <PublishToWordPress workspaceId={workspace.id} body={m.body} />
                   ) : null}
                   <p
@@ -188,7 +206,6 @@ function ChatPage() {
                   >
                     {timeOf(m.created_at)}
                   </p>
-
                 </div>
               </div>
             ))}
@@ -213,54 +230,52 @@ function ChatPage() {
             <div ref={endRef} />
           </div>
 
-          <div className="sticky bottom-0 border-t border-border bg-background/90 p-5 backdrop-blur-xl">
-            <SkillRunner
-              skills={employeeSkills}
-              disabled={!workspace}
-              pending={busy}
-              onRun={(skill, values) => {
-                setError(null);
-                skillRun.mutate({ skill, values });
-              }}
-            />
-            <div className="mb-3 flex flex-wrap gap-2">
-              {(starterPrompts[id] ?? []).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => submit(p)}
-                  disabled={busy}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-1.5 text-xs font-semibold transition-colors hover:bg-secondary disabled:opacity-50"
-                >
-                  <Sparkles className="size-3.5 text-jade" />
-                  {p}
-                </button>
-              ))}
-            </div>
+          <div className="sticky bottom-0 border-t border-border bg-background/85 p-4 backdrop-blur-xl sm:p-5">
             <form
               onSubmit={(e) => {
                 e.preventDefault();
                 submit(draft);
               }}
-              className="flex items-center gap-2 rounded-2xl border border-border bg-card p-2"
+              className="rounded-3xl border border-border bg-card p-2 shadow-sm transition-colors focus-within:border-primary"
             >
-              <input
+              <textarea
+                ref={inputRef}
                 value={draft}
+                rows={1}
                 onChange={(e) => setDraft(e.target.value)}
-                placeholder={`اكتب طلبك لـ${member.name}…`}
-                className="min-w-0 flex-1 bg-transparent px-3 py-2 outline-none"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    submit(draft);
+                  }
+                }}
+                placeholder={`اكتب طلبك لـ${member.name}… (Enter للإرسال)`}
+                dir="auto"
+                className="max-h-40 min-h-11 w-full resize-none bg-transparent px-3 py-2.5 outline-none"
               />
-              <button
-                type="submit"
-                disabled={busy || !workspace}
-                className="grid size-10 shrink-0 place-items-center rounded-xl bg-foreground text-background disabled:opacity-50"
-                aria-label="إرسال"
-              >
-                {busy ? (
-                  <Loader2 className="size-4.5 animate-spin" />
-                ) : (
-                  <Send className="size-4.5 -scale-x-100" />
-                )}
-              </button>
+              <div className="flex items-center justify-between gap-2 px-1 pb-0.5">
+                <SkillPalette
+                  skills={employeeSkills}
+                  disabled={!workspace}
+                  pending={busy}
+                  onRun={(skill, values) => {
+                    setError(null);
+                    skillRun.mutate({ skill, values });
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={busy || !workspace || !draft.trim()}
+                  className="grid size-10 shrink-0 place-items-center rounded-2xl bg-foreground text-background transition-opacity disabled:opacity-40"
+                  aria-label="إرسال"
+                >
+                  {busy ? (
+                    <Loader2 className="size-4.5 animate-spin" />
+                  ) : (
+                    <Send className="size-4.5 -scale-x-100" />
+                  )}
+                </button>
+              </div>
             </form>
           </div>
         </div>

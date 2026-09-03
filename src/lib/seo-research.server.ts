@@ -196,6 +196,47 @@ export async function serpSearch(query: string): Promise<SerpResult[]> {
   return results;
 }
 
+/**
+ * مستخرج روابط عام يُستخدم كشبكة أمان عندما يتغيّر HTML المحرك ويفشل التعبير الخاص،
+ * فيبقى البحث الحقيقي يعمل بدل أن يعود فارغاً.
+ */
+/** يفكّ روابط تحويل Bing (‎/ck/a?…u=a1<base64>) إلى الرابط الحقيقي. */
+function unwrapRedirect(url: string): string {
+  const enc = /[?&]u=a1([A-Za-z0-9_-]+)/.exec(url);
+  if (!enc?.[1]) return url;
+  try {
+    const decoded = Buffer.from(enc[1].replace(/-/g, "+").replace(/_/g, "/"), "base64").toString(
+      "utf8",
+    );
+    return /^https?:\/\//.test(decoded) ? decoded : url;
+  } catch {
+    return url;
+  }
+}
+
+function genericLinks(html: string, excludeHosts: string[]): SerpResult[] {
+  const out: SerpResult[] = [];
+  const seen = new Set<string>();
+  const rx = /<a[^>]+href="(https?:\/\/[^"#]+)"[^>]*>([\s\S]{0,400}?)<\/a>/g;
+  let m: RegExpExecArray | null;
+  while ((m = rx.exec(html)) && out.length < 12) {
+    const href = decodeEntities(m[1] ?? "");
+    const title = strip(decodeEntities(m[2] ?? "")).slice(0, 200);
+    if (title.length < 12) continue;
+    let host = "";
+    try {
+      host = new URL(href).hostname;
+    } catch {
+      continue;
+    }
+    if (excludeHosts.some((h) => host === h || host.endsWith(`.${h}`))) continue;
+    if (seen.has(href)) continue;
+    seen.add(href);
+    out.push({ rank: out.length + 1, title, url: href, snippet: "" });
+  }
+  return out;
+}
+
 async function serpSearchOnce(query: string): Promise<SerpResult[]> {
   const attempts: (() => Promise<SerpResult[]>)[] = [
     // 1) Brave Search (نتائج عربية حقيقية بلا مفتاح)
@@ -229,6 +270,7 @@ async function serpSearchOnce(query: string): Promise<SerpResult[]> {
       const instances = [
         "https://search.inetol.net",
         "https://searx.tiekoetter.com",
+        "https://searx.be",
         "https://opnxng.com",
         "https://paulgo.io",
       ];
@@ -266,11 +308,12 @@ async function serpSearchOnce(query: string): Promise<SerpResult[]> {
       );
       const out: SerpResult[] = [];
       const seen = new Set<string>();
-      const rx = /<li class="b_algo"[\s\S]{0,8000}?<h2[^>]*>([\s\S]*?)<\/h2>/g;
-      let m: RegExpExecArray | null;
-      while ((m = rx.exec(html)) && out.length < 10) {
-        const chunk = m[0] ?? "";
-        const title = strip(decodeEntities(m[1] ?? "")).slice(0, 200);
+      // نقسّم على بطاقات النتائج بدل تعبير واحد ضخم — أثبت مقاومة لتغيّر قالب Bing.
+      const chunks = html.split(/<li class="b_algo"/).slice(1);
+      for (const chunk of chunks) {
+        if (out.length >= 10) break;
+        const h2 = /<h2[^>]*>([\s\S]{0,600}?)<\/h2>/.exec(chunk);
+        const title = strip(decodeEntities(h2?.[1] ?? "")).slice(0, 200);
         const enc = /[?&]u=a1([A-Za-z0-9_-]+)/.exec(chunk);
         let href = "";
         if (enc?.[1]) {
@@ -282,11 +325,16 @@ async function serpSearchOnce(query: string): Promise<SerpResult[]> {
             href = "";
           }
         }
+        if (!href) {
+          const direct = /<h2[^>]*>\s*<a[^>]+href="(https?:\/\/[^"]+)"/.exec(chunk);
+          href = direct?.[1] ? decodeEntities(direct[1]) : "";
+        }
         if (!/^https?:\/\//.test(href) || !title || seen.has(href)) continue;
         seen.add(href);
         out.push({ rank: out.length + 1, title, url: href, snippet: "" });
       }
-      return out;
+      return out.length ? out : genericLinks(html, ["bing.com", "microsoft.com", "msn.com"]);
+
     },
     // 4) Startpage (نتائج جوجل عبر وسيط مجاني)
     async () => {
@@ -305,7 +353,7 @@ async function serpSearchOnce(query: string): Promise<SerpResult[]> {
         seen.add(href);
         out.push({ rank: out.length + 1, title, url: href, snippet: "" });
       }
-      return out;
+      return out.length ? out : genericLinks(html, ["startpage.com", "startmail.com"]);
     },
     // 5) DuckDuckGo Lite
     async () => {
@@ -323,7 +371,7 @@ async function serpSearchOnce(query: string): Promise<SerpResult[]> {
         if (!/^https?:\/\//.test(href)) continue;
         out.push({ rank: out.length + 1, title: strip(m[2] ?? "").slice(0, 200), url: href, snippet: "" });
       }
-      return out;
+      return out.length ? out : genericLinks(html, ["duckduckgo.com"]);
     },
     // 6) Mojeek (محرك مستقل يسمح بالقراءة)
     async () => {
@@ -336,32 +384,66 @@ async function serpSearchOnce(query: string): Promise<SerpResult[]> {
         if (!/^https?:\/\//.test(href)) continue;
         out.push({ rank: out.length + 1, title: strip(m[2] ?? "").slice(0, 200), url: href, snippet: "" });
       }
-      return out;
+      return out.length ? out : genericLinks(html, ["mojeek.com"]);
+    },
+    // 7) Marginalia (فهرس مستقل مفتوح المصدر) — احتياطي أخير
+    async () => {
+      const html = await getText(
+        `https://search.marginalia.nu/search?query=${encodeURIComponent(query)}`,
+        6_000,
+      );
+      return genericLinks(html, ["marginalia.nu", "memex.marginalia.nu"]);
     },
   ];
 
   // فلتر صلة عام: أي نتيجة لا تشترك مع الاستعلام في أي كلمة دالة تُستبعد،
   // لأن بعض المحركات ترد بنتائج مخزَّنة غير مرتبطة عند حجب الطلب.
+  // تطبيع عربي (الهمزات/الياء/التاء المربوطة/التشكيل) حتى لا نُسقط نتائج صحيحة بسبب اختلاف الإملاء.
+  const norm = (t: string) =>
+    t
+      .replace(/[\u064B-\u0652\u0640]/g, "")
+      .replace(/[أإآٱ]/g, "ا")
+      .replace(/ى/g, "ي")
+      .replace(/ة/g, "ه")
+      .replace(/ؤ/g, "و")
+      .replace(/ئ/g, "ي")
+      .toLowerCase();
   const tokens = query
     .split(/\s+/)
-    .map((t) => t.replace(/^(ال|أفضل|افضل|في|من)/, "").trim())
+    .map((t) => norm(t).replace(/^(ال|افضل|في|من)/, "").trim())
     .filter((t) => t.length > 2);
   const relevantOnly = (rows: SerpResult[]) =>
     tokens.length
       ? rows.filter((r) => {
-          const hay = `${r.title} ${decodeURIComponent(r.url)} ${r.snippet}`;
+          let url = r.url;
+          try {
+            url = decodeURIComponent(r.url);
+          } catch {
+            /* روابط بترميز تالف تُقرأ كما هي */
+          }
+          const hay = norm(`${r.title} ${url} ${r.snippet}`);
           return tokens.some((t) => hay.includes(t));
         })
       : rows;
 
   // كل المحركات تعمل بالتوازي وأول نتيجة صالحة تفوز — أسرع بكثير من التجربة بالتتابع.
   const clean = (rows: SerpResult[]) =>
-    relevantOnly(rows).map((r, i) => ({ ...r, rank: i + 1 }));
+    relevantOnly(rows.map((r) => ({ ...r, url: unwrapRedirect(r.url) }))).map((r, i) => ({
+      ...r,
+      rank: i + 1,
+    }));
 
-  const race = attempts.map(async (attempt) => {
-    const rows = clean(await attempt());
-    if (!rows.length) throw new Error("empty");
-    return rows;
+  const race = attempts.map(async (attempt, i) => {
+    try {
+      const rows = clean(await attempt());
+      if (!rows.length) throw new Error("empty");
+      return rows;
+    } catch (error) {
+      if (process.env["NOUR_DEBUG_SERP"]) {
+        console.error(`serp engine ${i}:`, (error as Error).message);
+      }
+      throw error;
+    }
   });
 
   try {
