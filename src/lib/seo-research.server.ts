@@ -418,7 +418,11 @@ async function serpSearchOnce(query: string): Promise<SerpResult[]> {
 
   const race = attempts.map(async (attempt, i) => {
     try {
-      const rows = clean(await attempt());
+      const raw = await attempt();
+      const rows = clean(raw);
+      if (process.env["NOUR_DEBUG_SERP"]) {
+        console.error(`serp engine ${i}: raw=${raw.length} kept=${rows.length}`, raw[0]?.url ?? "");
+      }
       if (!rows.length) throw new Error("empty");
       return rows;
     } catch (error) {
