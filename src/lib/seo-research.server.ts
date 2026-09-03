@@ -200,6 +200,20 @@ export async function serpSearch(query: string): Promise<SerpResult[]> {
  * مستخرج روابط عام يُستخدم كشبكة أمان عندما يتغيّر HTML المحرك ويفشل التعبير الخاص،
  * فيبقى البحث الحقيقي يعمل بدل أن يعود فارغاً.
  */
+/** يفكّ روابط تحويل Bing (‎/ck/a?…u=a1<base64>) إلى الرابط الحقيقي. */
+function unwrapRedirect(url: string): string {
+  const enc = /[?&]u=a1([A-Za-z0-9_-]+)/.exec(url);
+  if (!enc?.[1]) return url;
+  try {
+    const decoded = Buffer.from(enc[1].replace(/-/g, "+").replace(/_/g, "/"), "base64").toString(
+      "utf8",
+    );
+    return /^https?:\/\//.test(decoded) ? decoded : url;
+  } catch {
+    return url;
+  }
+}
+
 function genericLinks(html: string, excludeHosts: string[]): SerpResult[] {
   const out: SerpResult[] = [];
   const seen = new Set<string>();
@@ -414,15 +428,14 @@ async function serpSearchOnce(query: string): Promise<SerpResult[]> {
 
   // كل المحركات تعمل بالتوازي وأول نتيجة صالحة تفوز — أسرع بكثير من التجربة بالتتابع.
   const clean = (rows: SerpResult[]) =>
-    relevantOnly(rows).map((r, i) => ({ ...r, rank: i + 1 }));
+    relevantOnly(rows.map((r) => ({ ...r, url: unwrapRedirect(r.url) }))).map((r, i) => ({
+      ...r,
+      rank: i + 1,
+    }));
 
   const race = attempts.map(async (attempt, i) => {
     try {
-      const raw = await attempt();
-      const rows = clean(raw);
-      if (process.env["NOUR_DEBUG_SERP"]) {
-        console.error(`serp engine ${i}: raw=${raw.length} kept=${rows.length}`, raw[0]?.url ?? "");
-      }
+      const rows = clean(await attempt());
       if (!rows.length) throw new Error("empty");
       return rows;
     } catch (error) {
