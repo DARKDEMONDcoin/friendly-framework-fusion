@@ -43,6 +43,21 @@ export type ChatOptions = {
   race?: boolean;
 };
 
+/** خطأ حد الاستخدام اليومي المجاني على مستوى الحساب — لا فائدة من تجربة نماذج أخرى. */
+export class DailyFreeLimitError extends Error {
+  constructor(resetAt?: number) {
+    super(
+      `استُهلك الحد اليومي المجاني على OpenRouter (50 طلباً/يوم).${
+        resetAt ? ` يتجدّد في ${new Date(resetAt).toISOString().replace("T", " ").slice(0, 16)} UTC.` : ""
+      } أضف 10 أرصدة لرفع الحد إلى 1000 طلب/يوم، أو انتظر التجديد.`,
+    );
+    this.name = "DailyFreeLimitError";
+  }
+}
+
+/** نماذج ترفضنا نهائياً (مثل المتاحة لأدوات agentic فقط) — نستبعدها لبقية العملية. */
+const unavailable = new Set<string>();
+
 async function callModel(
   apiKey: string,
   model: string,
@@ -66,7 +81,24 @@ async function callModel(
     signal: AbortSignal.timeout(options.timeoutMs ?? 30_000),
   });
   if (res.status === 401) throw new Error("مفتاح OpenRouter غير صالح.");
-  if (!res.ok) throw new Error(`${model}: ${res.status}`);
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    if (res.status === 429 && text.includes("free-models-per-day")) {
+      let resetAt: number | undefined;
+      try {
+        const parsed = JSON.parse(text) as {
+          error?: { metadata?: { headers?: Record<string, string> } };
+        };
+        const raw = parsed.error?.metadata?.headers?.["X-RateLimit-Reset"];
+        if (raw) resetAt = Number(raw);
+      } catch {
+        /* تجاهل */
+      }
+      throw new DailyFreeLimitError(resetAt);
+    }
+    if (res.status === 403 && text.includes("agentic harnesses")) unavailable.add(model);
+    throw new Error(`${model}: ${res.status}`);
+  }
   const payload = (await res.json()) as {
     choices?: { message?: { content?: string } }[];
     error?: { message?: string };
@@ -82,7 +114,10 @@ export async function freeChat(
   messages: { role: string; content: string }[],
   options: ChatOptions = {},
 ): Promise<string> {
-  const pool = FREE_MODELS.slice(0, options.attempts ?? FREE_MODELS.length);
+  const pool = FREE_MODELS.filter((m) => !unavailable.has(m)).slice(
+    0,
+    options.attempts ?? FREE_MODELS.length,
+  );
   let lastError = "";
 
   if (options.race !== false && pool.length > 1) {
@@ -90,9 +125,12 @@ export async function freeChat(
     try {
       return await Promise.any(pool.slice(0, 2).map((m) => callModel(apiKey, m, messages, options)));
     } catch (error) {
-      const first = (error as AggregateError).errors?.[0] as Error | undefined;
-      if (first?.message.includes("مفتاح OpenRouter")) throw first;
-      lastError = first?.message ?? "فشل النموذجان الأسرع";
+      const errors = ((error as AggregateError).errors ?? []) as Error[];
+      const fatal = errors.find(
+        (e) => e instanceof DailyFreeLimitError || e.message.includes("مفتاح OpenRouter"),
+      );
+      if (fatal) throw fatal;
+      lastError = errors[0]?.message ?? "فشل النموذجان الأسرع";
     }
   }
 
@@ -100,6 +138,8 @@ export async function freeChat(
     try {
       return await callModel(apiKey, model, messages, options);
     } catch (error) {
+      // حد يومي أو مفتاح خاطئ: التوقف فوراً بدل استنزاف الوقت في نماذج ستفشل بنفس السبب.
+      if (error instanceof DailyFreeLimitError) throw error;
       const message = (error as Error).message;
       if (message.includes("مفتاح OpenRouter")) throw error;
       lastError = message;
@@ -107,6 +147,7 @@ export async function freeChat(
   }
   throw new Error(`تعذّر توليد الرد من النماذج المجانية (${lastError}).`);
 }
+
 
 
 export function parseJson<T>(raw: string): T | null {
