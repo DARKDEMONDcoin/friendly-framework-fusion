@@ -294,11 +294,12 @@ async function serpSearchOnce(query: string): Promise<SerpResult[]> {
       );
       const out: SerpResult[] = [];
       const seen = new Set<string>();
-      const rx = /<li class="b_algo"[\s\S]{0,8000}?<h2[^>]*>([\s\S]*?)<\/h2>/g;
-      let m: RegExpExecArray | null;
-      while ((m = rx.exec(html)) && out.length < 10) {
-        const chunk = m[0] ?? "";
-        const title = strip(decodeEntities(m[1] ?? "")).slice(0, 200);
+      // نقسّم على بطاقات النتائج بدل تعبير واحد ضخم — أثبت مقاومة لتغيّر قالب Bing.
+      const chunks = html.split(/<li class="b_algo"/).slice(1);
+      for (const chunk of chunks) {
+        if (out.length >= 10) break;
+        const h2 = /<h2[^>]*>([\s\S]{0,600}?)<\/h2>/.exec(chunk);
+        const title = strip(decodeEntities(h2?.[1] ?? "")).slice(0, 200);
         const enc = /[?&]u=a1([A-Za-z0-9_-]+)/.exec(chunk);
         let href = "";
         if (enc?.[1]) {
@@ -310,11 +311,16 @@ async function serpSearchOnce(query: string): Promise<SerpResult[]> {
             href = "";
           }
         }
+        if (!href) {
+          const direct = /<h2[^>]*>\s*<a[^>]+href="(https?:\/\/[^"]+)"/.exec(chunk);
+          href = direct?.[1] ? decodeEntities(direct[1]) : "";
+        }
         if (!/^https?:\/\//.test(href) || !title || seen.has(href)) continue;
         seen.add(href);
         out.push({ rank: out.length + 1, title, url: href, snippet: "" });
       }
       return out.length ? out : genericLinks(html, ["bing.com", "microsoft.com", "msn.com"]);
+
     },
     // 4) Startpage (نتائج جوجل عبر وسيط مجاني)
     async () => {
