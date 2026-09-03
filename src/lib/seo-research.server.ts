@@ -416,10 +416,17 @@ async function serpSearchOnce(query: string): Promise<SerpResult[]> {
   const clean = (rows: SerpResult[]) =>
     relevantOnly(rows).map((r, i) => ({ ...r, rank: i + 1 }));
 
-  const race = attempts.map(async (attempt) => {
-    const rows = clean(await attempt());
-    if (!rows.length) throw new Error("empty");
-    return rows;
+  const race = attempts.map(async (attempt, i) => {
+    try {
+      const rows = clean(await attempt());
+      if (!rows.length) throw new Error("empty");
+      return rows;
+    } catch (error) {
+      if (process.env["NOUR_DEBUG_SERP"]) {
+        console.error(`serp engine ${i}:`, (error as Error).message);
+      }
+      throw error;
+    }
   });
 
   try {
