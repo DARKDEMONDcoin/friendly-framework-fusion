@@ -150,7 +150,7 @@ export async function planResearch(
       },
       { role: "user", content: `العلامة: ${brand.name} (${brand.industry})\nالطلب: ${message}` },
     ],
-    { json: true },
+    { json: true, timeoutMs: 9_000, maxTokens: 300, attempts: 3 },
   );
   const plan = parseJson<ResearchPlan>(raw) ?? {};
   const clean = (arr: unknown, max: number) =>
