@@ -198,11 +198,16 @@ export async function executeSkill(
   });
 
   let output = (
-    await freeChat(apiKey, [
-      { role: "system", content: system },
-      { role: "user", content: prompt },
-    ])
+    await freeChat(
+      apiKey,
+      [
+        { role: "system", content: system },
+        { role: "user", content: prompt },
+      ],
+      { timeoutMs: 55_000, maxTokens: 3200 },
+    )
   ).trim();
+
   if (!output) throw new Error("لم يصل مخرج من الموظف — أعد المحاولة.");
   if (research.used.length) {
     output = `${output}\n\n> مصادر البيانات: ${research.used.join(" · ")}`;
