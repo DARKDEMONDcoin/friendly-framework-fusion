@@ -196,6 +196,33 @@ export async function serpSearch(query: string): Promise<SerpResult[]> {
   return results;
 }
 
+/**
+ * مستخرج روابط عام يُستخدم كشبكة أمان عندما يتغيّر HTML المحرك ويفشل التعبير الخاص،
+ * فيبقى البحث الحقيقي يعمل بدل أن يعود فارغاً.
+ */
+function genericLinks(html: string, excludeHosts: string[]): SerpResult[] {
+  const out: SerpResult[] = [];
+  const seen = new Set<string>();
+  const rx = /<a[^>]+href="(https?:\/\/[^"#]+)"[^>]*>([\s\S]{0,400}?)<\/a>/g;
+  let m: RegExpExecArray | null;
+  while ((m = rx.exec(html)) && out.length < 12) {
+    const href = decodeEntities(m[1] ?? "");
+    const title = strip(decodeEntities(m[2] ?? "")).slice(0, 200);
+    if (title.length < 12) continue;
+    let host = "";
+    try {
+      host = new URL(href).hostname;
+    } catch {
+      continue;
+    }
+    if (excludeHosts.some((h) => host === h || host.endsWith(`.${h}`))) continue;
+    if (seen.has(href)) continue;
+    seen.add(href);
+    out.push({ rank: out.length + 1, title, url: href, snippet: "" });
+  }
+  return out;
+}
+
 async function serpSearchOnce(query: string): Promise<SerpResult[]> {
   const attempts: (() => Promise<SerpResult[]>)[] = [
     // 1) Brave Search (نتائج عربية حقيقية بلا مفتاح)
@@ -229,6 +256,7 @@ async function serpSearchOnce(query: string): Promise<SerpResult[]> {
       const instances = [
         "https://search.inetol.net",
         "https://searx.tiekoetter.com",
+        "https://searx.be",
         "https://opnxng.com",
         "https://paulgo.io",
       ];
@@ -286,7 +314,7 @@ async function serpSearchOnce(query: string): Promise<SerpResult[]> {
         seen.add(href);
         out.push({ rank: out.length + 1, title, url: href, snippet: "" });
       }
-      return out;
+      return out.length ? out : genericLinks(html, ["bing.com", "microsoft.com", "msn.com"]);
     },
     // 4) Startpage (نتائج جوجل عبر وسيط مجاني)
     async () => {
@@ -305,7 +333,7 @@ async function serpSearchOnce(query: string): Promise<SerpResult[]> {
         seen.add(href);
         out.push({ rank: out.length + 1, title, url: href, snippet: "" });
       }
-      return out;
+      return out.length ? out : genericLinks(html, ["startpage.com", "startmail.com"]);
     },
     // 5) DuckDuckGo Lite
     async () => {
@@ -323,7 +351,7 @@ async function serpSearchOnce(query: string): Promise<SerpResult[]> {
         if (!/^https?:\/\//.test(href)) continue;
         out.push({ rank: out.length + 1, title: strip(m[2] ?? "").slice(0, 200), url: href, snippet: "" });
       }
-      return out;
+      return out.length ? out : genericLinks(html, ["duckduckgo.com"]);
     },
     // 6) Mojeek (محرك مستقل يسمح بالقراءة)
     async () => {
@@ -336,7 +364,15 @@ async function serpSearchOnce(query: string): Promise<SerpResult[]> {
         if (!/^https?:\/\//.test(href)) continue;
         out.push({ rank: out.length + 1, title: strip(m[2] ?? "").slice(0, 200), url: href, snippet: "" });
       }
-      return out;
+      return out.length ? out : genericLinks(html, ["mojeek.com"]);
+    },
+    // 7) Marginalia (فهرس مستقل مفتوح المصدر) — احتياطي أخير
+    async () => {
+      const html = await getText(
+        `https://search.marginalia.nu/search?query=${encodeURIComponent(query)}`,
+        6_000,
+      );
+      return genericLinks(html, ["marginalia.nu", "memex.marginalia.nu"]);
     },
   ];
 
