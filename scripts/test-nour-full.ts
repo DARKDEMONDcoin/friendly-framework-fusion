@@ -38,11 +38,12 @@ async function timed<T>(name: string, fn: () => Promise<T>, shape: (v: T) => unk
 
 const skills = [
   { id: "keyword-research", values: { topic: "تأمين سيارات في السعودية", market: "السعودية" } },
-  { id: "article", values: { topic: "أفضل بطاقات ائتمان بدون رسوم في مصر", keyword: "بطاقات ائتمان بدون رسوم" } },
+  { id: "seo-article", values: { topic: "أفضل بطاقات ائتمان بدون رسوم في مصر", keyword: "بطاقات ائتمان بدون رسوم" } },
   { id: "serp-brief", values: { keyword: "أسعار الذهب اليوم", market: "مصر" } },
   { id: "meta-pack", values: { url: "https://ar.wikipedia.org/wiki/تحسين_محركات_البحث", keyword: "تحسين محركات البحث" } },
   { id: "geo-answers", values: { topic: "كيف أختار شركة استضافة عربية" } },
-  { id: "technical-audit", values: { url: "https://ar.wikipedia.org/wiki/سيو" } },
+  { id: "seo-audit", values: { url: "https://ar.wikipedia.org/wiki/سيو" } },
+  { id: "publish-package", values: { topic: "دليل تحسين المتاجر العربية", keyword: "تحسين متجر إلكتروني" } },
 ];
 
 const results = await Promise.all([
@@ -70,13 +71,14 @@ const results = await Promise.all([
     "freeChat",
     () =>
       freeChat(
+        process.env["OPENROUTER_API_KEY"]!,
         [
           { role: "system", content: "أنت نور، خبيرة SEO عربية. أجيبي بإيجاز." },
           { role: "user", content: "اذكري 3 أخطاء SEO شائعة في المواقع العربية." },
         ],
-        { maxTokens: 400, budgetMs: 30_000 },
+        { maxTokens: 400 },
       ),
-    (v) => ({ model: v.model, chars: v.content.length, head: v.content.slice(0, 90) }),
+    (v) => ({ chars: v.length, head: v.slice(0, 90).replace(/\n/g, " ") }),
   ),
   ...skills.map((s) =>
     timed(
