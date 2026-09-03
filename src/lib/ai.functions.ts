@@ -67,6 +67,7 @@ export const askEmployee = createServerFn({ method: "POST" })
       { name: workspace.name, industry: workspace.industry },
       data.message,
       data.workspaceId,
+      12_000,
     );
 
     const system = [
@@ -91,11 +92,15 @@ export const askEmployee = createServerFn({ method: "POST" })
       .reverse()
       .map((m) => ({ role: m.role === "user" ? "user" : "assistant", content: m.body }));
 
-    const raw = await freeChat(apiKey, [
-      { role: "system", content: system },
-      ...priorMessages,
-      { role: "user", content: data.message },
-    ]);
+    const raw = await freeChat(
+      apiKey,
+      [
+        { role: "system", content: system },
+        ...priorMessages,
+        { role: "user", content: data.message },
+      ],
+      { json: true, timeoutMs: 30_000, maxTokens: 1400 },
+    );
 
     let reply = raw;
     let deliverable: Deliverable | null = null;

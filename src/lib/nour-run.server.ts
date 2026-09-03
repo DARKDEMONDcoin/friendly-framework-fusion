@@ -8,6 +8,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { getSkill } from "@/data/skills";
 import { freeChat, gatherEvidence, planResearch } from "./nour-research.server";
+import { withBudget } from "./seo-research.server";
 import { memoryBlock } from "./memory.server";
 
 export type Client = SupabaseClient<Database>;
