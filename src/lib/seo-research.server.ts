@@ -384,14 +384,30 @@ async function serpSearchOnce(query: string): Promise<SerpResult[]> {
 
   // فلتر صلة عام: أي نتيجة لا تشترك مع الاستعلام في أي كلمة دالة تُستبعد،
   // لأن بعض المحركات ترد بنتائج مخزَّنة غير مرتبطة عند حجب الطلب.
+  // تطبيع عربي (الهمزات/الياء/التاء المربوطة/التشكيل) حتى لا نُسقط نتائج صحيحة بسبب اختلاف الإملاء.
+  const norm = (t: string) =>
+    t
+      .replace(/[\u064B-\u0652\u0640]/g, "")
+      .replace(/[أإآٱ]/g, "ا")
+      .replace(/ى/g, "ي")
+      .replace(/ة/g, "ه")
+      .replace(/ؤ/g, "و")
+      .replace(/ئ/g, "ي")
+      .toLowerCase();
   const tokens = query
     .split(/\s+/)
-    .map((t) => t.replace(/^(ال|أفضل|افضل|في|من)/, "").trim())
+    .map((t) => norm(t).replace(/^(ال|افضل|في|من)/, "").trim())
     .filter((t) => t.length > 2);
   const relevantOnly = (rows: SerpResult[]) =>
     tokens.length
       ? rows.filter((r) => {
-          const hay = `${r.title} ${decodeURIComponent(r.url)} ${r.snippet}`;
+          let url = r.url;
+          try {
+            url = decodeURIComponent(r.url);
+          } catch {
+            /* روابط بترميز تالف تُقرأ كما هي */
+          }
+          const hay = norm(`${r.title} ${url} ${r.snippet}`);
           return tokens.some((t) => hay.includes(t));
         })
       : rows;
