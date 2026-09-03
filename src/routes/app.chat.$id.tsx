@@ -217,54 +217,52 @@ function ChatPage() {
             <div ref={endRef} />
           </div>
 
-          <div className="sticky bottom-0 border-t border-border bg-background/90 p-5 backdrop-blur-xl">
-            <SkillRunner
-              skills={employeeSkills}
-              disabled={!workspace}
-              pending={busy}
-              onRun={(skill, values) => {
-                setError(null);
-                skillRun.mutate({ skill, values });
-              }}
-            />
-            <div className="mb-3 flex flex-wrap gap-2">
-              {(starterPrompts[id] ?? []).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => submit(p)}
-                  disabled={busy}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-1.5 text-xs font-semibold transition-colors hover:bg-secondary disabled:opacity-50"
-                >
-                  <Sparkles className="size-3.5 text-jade" />
-                  {p}
-                </button>
-              ))}
-            </div>
+          <div className="sticky bottom-0 border-t border-border bg-background/85 p-4 backdrop-blur-xl sm:p-5">
             <form
               onSubmit={(e) => {
                 e.preventDefault();
                 submit(draft);
               }}
-              className="flex items-center gap-2 rounded-2xl border border-border bg-card p-2"
+              className="rounded-3xl border border-border bg-card p-2 shadow-sm transition-colors focus-within:border-primary"
             >
-              <input
+              <textarea
+                ref={inputRef}
                 value={draft}
+                rows={1}
                 onChange={(e) => setDraft(e.target.value)}
-                placeholder={`اكتب طلبك لـ${member.name}…`}
-                className="min-w-0 flex-1 bg-transparent px-3 py-2 outline-none"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    submit(draft);
+                  }
+                }}
+                placeholder={`اكتب طلبك لـ${member.name}… (Enter للإرسال)`}
+                dir="auto"
+                className="max-h-40 min-h-11 w-full resize-none bg-transparent px-3 py-2.5 outline-none"
               />
-              <button
-                type="submit"
-                disabled={busy || !workspace}
-                className="grid size-10 shrink-0 place-items-center rounded-xl bg-foreground text-background disabled:opacity-50"
-                aria-label="إرسال"
-              >
-                {busy ? (
-                  <Loader2 className="size-4.5 animate-spin" />
-                ) : (
-                  <Send className="size-4.5 -scale-x-100" />
-                )}
-              </button>
+              <div className="flex items-center justify-between gap-2 px-1 pb-0.5">
+                <SkillPalette
+                  skills={employeeSkills}
+                  disabled={!workspace}
+                  pending={busy}
+                  onRun={(skill, values) => {
+                    setError(null);
+                    skillRun.mutate({ skill, values });
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={busy || !workspace || !draft.trim()}
+                  className="grid size-10 shrink-0 place-items-center rounded-2xl bg-foreground text-background transition-opacity disabled:opacity-40"
+                  aria-label="إرسال"
+                >
+                  {busy ? (
+                    <Loader2 className="size-4.5 animate-spin" />
+                  ) : (
+                    <Send className="size-4.5 -scale-x-100" />
+                  )}
+                </button>
+              </div>
             </form>
           </div>
         </div>
