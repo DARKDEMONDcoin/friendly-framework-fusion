@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Send, Settings2, Sparkles, Loader2 } from "lucide-react";
+import { Send, Settings2, Loader2 } from "lucide-react";
 
 import { AppShell } from "@/components/app/AppShell";
 import { AppIcon, appLabel } from "@/components/site/AppIcon";
@@ -69,6 +69,7 @@ function ChatPage() {
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const ask = useServerFn(askEmployee);
   const runSkillFn = useServerFn(runSkill);
   const employeeSkills = skillsFor(id);
@@ -113,6 +114,18 @@ function ChatPage() {
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages?.length, send.isPending, skillRun.isPending]);
+
+  // إبقاء التركيز في مربع الكتابة + تمدد تلقائي لارتفاع النص.
+  useEffect(() => {
+    if (!busy) inputRef.current?.focus();
+  }, [busy, id]);
+
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+  }, [draft]);
 
   const submit = (text: string) => {
     const body = text.trim();
