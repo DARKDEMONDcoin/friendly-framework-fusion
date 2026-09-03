@@ -111,7 +111,7 @@ export async function keywordExpansion(seed: string): Promise<KeywordExpansion> 
 
 export type SerpResult = { rank: number; title: string; url: string; snippet: string };
 
-async function getText(url: string, ms = 12_000): Promise<string> {
+async function getText(url: string, ms = 7_000): Promise<string> {
   try {
     const res = await fetch(url, {
       headers: { "User-Agent": UA, "Accept-Language": "ar,en;q=0.8" },
@@ -132,7 +132,7 @@ const serpCache = new Map<string, SerpResult[]>();
 let serpQueue: Promise<unknown> = Promise.resolve();
 
 /** طابور تسلسلي مع تباعد زمني: يمنع رفض محركات البحث للطلبات المتوازية. */
-function queued<T>(fn: () => Promise<T>, spacingMs = 1_200): Promise<T> {
+function queued<T>(fn: () => Promise<T>, spacingMs = 250): Promise<T> {
   const run = serpQueue.then(async () => {
     const value = await fn();
     await new Promise((r) => setTimeout(r, spacingMs));
@@ -188,7 +188,7 @@ export async function serpSearch(query: string): Promise<SerpResult[]> {
     return stored;
   }
 
-  const results = await queued(() => serpSearchOnce(query));
+  const results = await queued(() => serpSearchOnce(query), 250);
   if (results.length) {
     serpCache.set(query, results);
     await serpToDb(query, results);
@@ -202,7 +202,7 @@ async function serpSearchOnce(query: string): Promise<SerpResult[]> {
     async () => {
       const html = await getText(
         `https://search.brave.com/search?q=${encodeURIComponent(query)}`,
-        15_000,
+        7_000,
       );
       const out: SerpResult[] = [];
       const seen = new Set<string>();
@@ -235,7 +235,7 @@ async function serpSearchOnce(query: string): Promise<SerpResult[]> {
       for (const base of instances) {
         const raw = await getText(
           `${base}/search?q=${encodeURIComponent(query)}&format=json&language=ar`,
-          10_000,
+          6_000,
         );
         if (!raw.trim().startsWith("{")) continue;
         try {
@@ -262,7 +262,7 @@ async function serpSearchOnce(query: string): Promise<SerpResult[]> {
     async () => {
       const html = await getText(
         `https://www.bing.com/search?q=${encodeURIComponent(query)}&setlang=ar`,
-        15_000,
+        7_000,
       );
       const out: SerpResult[] = [];
       const seen = new Set<string>();
@@ -292,7 +292,7 @@ async function serpSearchOnce(query: string): Promise<SerpResult[]> {
     async () => {
       const html = await getText(
         `https://www.startpage.com/sp/search?query=${encodeURIComponent(query)}`,
-        15_000,
+        7_000,
       );
       const out: SerpResult[] = [];
       const seen = new Set<string>();
@@ -354,16 +354,40 @@ async function serpSearchOnce(query: string): Promise<SerpResult[]> {
         })
       : rows;
 
-  for (const attempt of attempts) {
-    try {
-      const results = relevantOnly(await attempt()).map((r, i) => ({ ...r, rank: i + 1 }));
-      if (results.length) return results;
-    } catch {
-      // نتابع للمصدر التالي
-    }
+  // كل المحركات تعمل بالتوازي وأول نتيجة صالحة تفوز — أسرع بكثير من التجربة بالتتابع.
+  const clean = (rows: SerpResult[]) =>
+    relevantOnly(rows).map((r, i) => ({ ...r, rank: i + 1 }));
+
+  const race = attempts.map(async (attempt) => {
+    const rows = clean(await attempt());
+    if (!rows.length) throw new Error("empty");
+    return rows;
+  });
+
+  try {
+    return await withBudget(Promise.any(race), 9_000, [] as SerpResult[]);
+  } catch {
+    return [];
   }
-  return [];
 }
+
+/** ينفّذ وعداً بميزانية زمنية صارمة ويعيد بديلاً عند التجاوز — يمنع تعليق الردود. */
+export async function withBudget<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((resolve) => {
+        timer = setTimeout(() => resolve(fallback), ms);
+      }),
+    ]);
+  } catch {
+    return fallback;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 
 export type CompetitorInventory = {
   domain: string;

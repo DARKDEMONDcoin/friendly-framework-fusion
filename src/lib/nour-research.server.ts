@@ -22,7 +22,7 @@ const OPENROUTER = "https://openrouter.ai/api/v1/chat/completions";
 
 /**
  * أفضل النماذج المجانية على OpenRouter بترتيب مُختبَر (جودة عربية + سرعة + توافر)،
- * مع تجاوز تلقائي عند 429/5xx أو رد فارغ.
+ * مع تجاوز تلقائي عند 429/5xx أو رد فارغ أو تجاوز المهلة.
  */
 export const FREE_MODELS = [
   "nvidia/nemotron-3-ultra-550b-a55b:free",
@@ -30,55 +30,84 @@ export const FREE_MODELS = [
   "nvidia/nemotron-3-super-120b-a12b:free",
   "minimax/minimax-m2.7:free",
   "z-ai/glm-5.2:free",
-  "openrouter/free",
 ];
 
+export type ChatOptions = {
+  json?: boolean;
+  /** مهلة كل نموذج بالمللي ثانية (تمنع التعليق نهائياً). */
+  timeoutMs?: number;
+  maxTokens?: number;
+  /** عدد النماذج التي نجربها قبل الاستسلام. */
+  attempts?: number;
+  /** نجرّب أول نموذجين بالتوازي: أول رد يفوز — أسرع زمن وصول ممكن. */
+  race?: boolean;
+};
+
+async function callModel(
+  apiKey: string,
+  model: string,
+  messages: { role: string; content: string }[],
+  options: ChatOptions,
+): Promise<string> {
+  const res = await fetch(OPENROUTER, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": "https://friendly-framework-fusion.lovable.app",
+      "X-Title": "Nour AI Employee",
+    },
+    body: JSON.stringify({
+      model,
+      ...(options.json ? { response_format: { type: "json_object" } } : {}),
+      max_tokens: options.maxTokens ?? 1800,
+      messages,
+    }),
+    signal: AbortSignal.timeout(options.timeoutMs ?? 30_000),
+  });
+  if (res.status === 401) throw new Error("مفتاح OpenRouter غير صالح.");
+  if (!res.ok) throw new Error(`${model}: ${res.status}`);
+  const payload = (await res.json()) as {
+    choices?: { message?: { content?: string } }[];
+    error?: { message?: string };
+  };
+  const content = payload.choices?.[0]?.message?.content ?? "";
+  if (!content.trim()) throw new Error(`${model}: رد فارغ`);
+  return content;
+}
 
 /** نداء النموذج عبر OpenRouter (نماذج مجانية) مع تجاوز تلقائي بين النماذج. */
 export async function freeChat(
   apiKey: string,
   messages: { role: string; content: string }[],
-  options: { json?: boolean } = {},
+  options: ChatOptions = {},
 ): Promise<string> {
+  const pool = FREE_MODELS.slice(0, options.attempts ?? FREE_MODELS.length);
   let lastError = "";
-  for (const model of FREE_MODELS) {
-    let res: Response;
+
+  if (options.race !== false && pool.length > 1) {
+    // أول نموذجين بالتوازي: يقلّل زمن الانتظار إلى أسرع نموذج متاح لحظياً.
     try {
-      res = await fetch(OPENROUTER, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://friendly-framework-fusion.lovable.app",
-          "X-Title": "Nour AI Employee",
-        },
-        body: JSON.stringify({
-          model,
-          ...(options.json ? { response_format: { type: "json_object" } } : {}),
-          messages,
-        }),
-      });
-    } catch {
-      lastError = "تعذّر الاتصال بمزوّد النماذج";
-      continue;
+      return await Promise.any(pool.slice(0, 2).map((m) => callModel(apiKey, m, messages, options)));
+    } catch (error) {
+      const first = (error as AggregateError).errors?.[0] as Error | undefined;
+      if (first?.message.includes("مفتاح OpenRouter")) throw first;
+      lastError = first?.message ?? "فشل النموذجان الأسرع";
     }
-    if (res.status === 401) throw new Error("مفتاح OpenRouter غير صالح.");
-    if (res.ok) {
-      const payload = (await res.json()) as {
-        choices?: { message?: { content?: string } }[];
-        error?: { message?: string };
-      };
-      const content = payload.choices?.[0]?.message?.content ?? "";
-      if (content.trim()) return content;
-      lastError = payload.error?.message ?? "رد فارغ";
-      continue;
+  }
+
+  for (const model of pool.slice(options.race === false ? 0 : 2)) {
+    try {
+      return await callModel(apiKey, model, messages, options);
+    } catch (error) {
+      const message = (error as Error).message;
+      if (message.includes("مفتاح OpenRouter")) throw error;
+      lastError = message;
     }
-    // 429 (حد مجاني) أو 5xx: ننتقل للنموذج التالي بدل الفشل
-    lastError = `${res.status}`;
   }
   throw new Error(`تعذّر توليد الرد من النماذج المجانية (${lastError}).`);
-
 }
+
 
 export function parseJson<T>(raw: string): T | null {
   const cleaned = raw
@@ -121,7 +150,7 @@ export async function planResearch(
       },
       { role: "user", content: `العلامة: ${brand.name} (${brand.industry})\nالطلب: ${message}` },
     ],
-    { json: true },
+    { json: true, timeoutMs: 9_000, maxTokens: 300, attempts: 3 },
   );
   const plan = parseJson<ResearchPlan>(raw) ?? {};
   const clean = (arr: unknown, max: number) =>
