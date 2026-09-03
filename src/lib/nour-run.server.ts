@@ -79,8 +79,11 @@ export async function researchFor(
   brand: { name: string; industry: string },
   message: string,
   workspaceId: string,
+  /** سقف زمني صارم لجمع الأدلة: بعده تُجيب نور بما توفّر بدل تعليق الرد. */
+  budgetMs = 25_000,
 ): Promise<{ block: string; used: string[] }> {
   if (!RESEARCH_EMPLOYEES.has(employeeId)) return { block: "", used: [] };
+  if (!needsResearch(message)) return { block: "", used: [] };
   try {
     const plan = await planResearch(apiKey, brand, message);
     if (
@@ -91,13 +94,31 @@ export async function researchFor(
     ) {
       return { block: "", used: [] };
     }
-    const evidence = await gatherEvidence(plan, workspaceId);
+    const evidence = await withBudget(gatherEvidence(plan, workspaceId), budgetMs, {
+      block: "",
+      sources: [] as string[],
+      used: [] as string[],
+    });
     return { block: evidence.block, used: evidence.used };
   } catch (error) {
     console.error("[nour] research failed:", error);
     return { block: "", used: [] };
   }
 }
+
+/** محادثة قصيرة/تحية لا تحتاج بحثاً ميدانياً — نرد فوراً. */
+function needsResearch(message: string): boolean {
+  const text = message.trim();
+  if (text.length < 25) return false;
+  const signals = [
+    "كلمات", "كلمة", "سيو", "seo", "ترتيب", "منافس", "بحث", "مقال", "محتوى", "صفحة",
+    "رابط", "http", "نقرات", "ظهور", "search console", "خطة", "استراتيج", "تحليل",
+    "موقع", "مدونة", "شهري", "تقرير", "فرص", "عنوان", "ميتا", "schema",
+  ];
+  const lower = text.toLowerCase();
+  return signals.some((s) => lower.includes(s));
+}
+
 
 export type SkillRun = {
   output: string;
