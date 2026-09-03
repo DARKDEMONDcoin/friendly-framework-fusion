@@ -7,10 +7,11 @@ import { Send, Settings2, Sparkles, Loader2 } from "lucide-react";
 import { AppShell } from "@/components/app/AppShell";
 import { AppIcon, appLabel } from "@/components/site/AppIcon";
 import { getMember } from "@/data/team";
-import { starterPrompts, integrationStatusLabel } from "@/data/app";
+import { integrationStatusLabel } from "@/data/app";
 import { useIntegrations, useMessages, useWorkspace } from "@/lib/data";
 import { askEmployee, runSkill } from "@/lib/ai.functions";
-import { SkillRunner } from "@/components/app/SkillRunner";
+import { SkillPalette } from "@/components/app/SkillPalette";
+import { Markdown } from "@/components/app/Markdown";
 import { PublishToWordPress } from "@/components/app/PublishToWordPress";
 
 import { skillsFor, type Skill } from "@/data/skills";
