@@ -158,12 +158,30 @@ export async function executeSkill(
   ]);
   if (!workspace) throw new Error("مساحة العمل غير موجودة.");
 
-  const prompt = skill.buildPrompt(params.values);
+  // نكمل القيم الناقصة من تعريف الحقول (defaultValue أو أول خيار) حتى لا يظهر "undefined"
+  // في أي مخرج عند التشغيل التلقائي أو الاستدعاء من المحادثة.
+  const values: Record<string, string> = {};
+  for (const field of skill.fields) {
+    const provided = params.values[field.name];
+    values[field.name] =
+      (provided?.trim() ? provided : undefined) ??
+      field.defaultValue ??
+      field.options?.[0] ??
+      "";
+  }
+  for (const [key, value] of Object.entries(params.values)) {
+    if (value?.trim() && !(key in values)) values[key] = value;
+  }
+  const missing = skill.fields.filter((f) => f.required && !values[f.name]?.trim()).map((f) => f.label);
+  if (missing.length) throw new Error(`بيانات ناقصة لهذه القدرة: ${missing.join("، ")}.`);
 
-  const requestSummary = Object.entries(params.values)
+  const prompt = skill.buildPrompt(values);
+
+  const requestSummary = Object.entries(values)
     .filter(([, v]) => v?.trim())
     .map(([k, v]) => `${k}: ${v.length > 120 ? `${v.slice(0, 120)}…` : v}`)
     .join(" · ");
+
 
   const brainText = memoryBlock(brain ?? [], `${skill.title} ${requestSummary}`, 8);
 
