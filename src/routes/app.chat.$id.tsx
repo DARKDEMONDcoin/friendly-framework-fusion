@@ -171,14 +171,18 @@ function ChatPage() {
                 ) : null}
                 <div
                   className={cn(
-                    "max-w-[38rem] rounded-3xl px-5 py-3.5 leading-relaxed whitespace-pre-wrap",
+                    "min-w-0 max-w-[min(46rem,88%)] rounded-3xl px-5 py-3.5 leading-relaxed",
                     m.role === "user"
-                      ? "bg-foreground text-background"
-                      : "border border-border bg-card",
+                      ? "rounded-se-lg bg-foreground text-background whitespace-pre-wrap"
+                      : "rounded-ss-lg border border-border bg-card shadow-sm",
                   )}
                 >
-                  <p>{m.body}</p>
-                  {m.role !== "user" && id === "nour" && workspace && wpConnected && m.body.length > 200 ? (
+                  {m.role === "user" ? <p dir="auto">{m.body}</p> : <Markdown body={m.body} />}
+                  {m.role !== "user" &&
+                  id === "nour" &&
+                  workspace &&
+                  wpConnected &&
+                  m.body.length > 200 ? (
                     <PublishToWordPress workspaceId={workspace.id} body={m.body} />
                   ) : null}
                   <p
@@ -189,7 +193,6 @@ function ChatPage() {
                   >
                     {timeOf(m.created_at)}
                   </p>
-
                 </div>
               </div>
             ))}
