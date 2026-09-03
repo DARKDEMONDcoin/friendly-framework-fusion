@@ -354,16 +354,40 @@ async function serpSearchOnce(query: string): Promise<SerpResult[]> {
         })
       : rows;
 
-  for (const attempt of attempts) {
-    try {
-      const results = relevantOnly(await attempt()).map((r, i) => ({ ...r, rank: i + 1 }));
-      if (results.length) return results;
-    } catch {
-      // نتابع للمصدر التالي
-    }
+  // كل المحركات تعمل بالتوازي وأول نتيجة صالحة تفوز — أسرع بكثير من التجربة بالتتابع.
+  const clean = (rows: SerpResult[]) =>
+    relevantOnly(rows).map((r, i) => ({ ...r, rank: i + 1 }));
+
+  const race = attempts.map(async (attempt) => {
+    const rows = clean(await attempt());
+    if (!rows.length) throw new Error("empty");
+    return rows;
+  });
+
+  try {
+    return await withBudget(Promise.any(race), 9_000, [] as SerpResult[]);
+  } catch {
+    return [];
   }
-  return [];
 }
+
+/** ينفّذ وعداً بميزانية زمنية صارمة ويعيد بديلاً عند التجاوز — يمنع تعليق الردود. */
+export async function withBudget<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((resolve) => {
+        timer = setTimeout(() => resolve(fallback), ms);
+      }),
+    ]);
+  } catch {
+    return fallback;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 
 export type CompetitorInventory = {
   domain: string;
